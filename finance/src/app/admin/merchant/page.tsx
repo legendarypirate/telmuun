@@ -1,0 +1,445 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { Table, Spin, message, Tag, Button, DatePicker, Select, Space } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import type { RangePickerProps } from 'antd/es/date-picker';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+import * as XLSX from 'xlsx';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+const { RangePicker } = DatePicker;
+const { Option } = Select;
+
+interface ReportData {
+  id: number;
+  merchant_id: number;
+  phone: string;
+  address: string;
+  image: string | null;
+  status: number;
+  price: string;
+  comment: string;
+  delivery_price: string;
+  driver_id: number;
+  report_stage: number;
+  is_reported: boolean;
+  is_deleted: boolean;
+  report_id: number;
+  delivery_id: string;
+  createdAt: string;
+  updatedAt: string;
+  merchant?: { username: string };
+  status_name?: { status: string; color: string | null };
+  driver?: { username: string };
+}
+
+interface Driver {
+  id: number;
+  username: string;
+}
+
+export default function MergeReportPage() {
+  const [loading, setLoading] = useState<boolean>(false);
+  const [data, setData] = useState<ReportData[]>([]);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [merchantId, setMerchantId] = useState<number | undefined>();
+  const [dateRange, setDateRange] = useState<[string, string] | undefined>();
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [user, setUser] = useState<any>(null);
+  const [isMerchant, setIsMerchant] = useState<boolean>(false);
+
+  // Get user data from localStorage
+  useEffect(() => {
+    const userData = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+    const userObj = userData ? JSON.parse(userData) : null;
+    setUser(userObj);
+    setIsMerchant(userObj?.role === 2);
+    
+    // If user is merchant, set merchantId to their ID
+    if (userObj?.role === 2) {
+      setMerchantId(userObj.id);
+    }
+  }, []);
+
+  const handlePriceChange = async (id: number, newPrice: string) => {
+    // Prevent editing if user is merchant
+    if (isMerchant) {
+      message.error('Merchant users cannot edit prices');
+      return;
+    }
+
+    try {
+      // Optimistic update in frontend
+      setData((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, price: newPrice } : item))
+      );
+  
+      // Send update to backend
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/delivery/update_price/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ price: parseFloat(newPrice) }),
+      });
+  
+      const result = await res.json();
+      if (!result.success) {
+        message.error('Failed to update price');
+      }
+    } catch (err) {
+      message.error('Error updating price');
+    }
+  };
+
+  const handleDeliveryPrice = async (id: number, newPrice: string) => {
+    // Prevent editing if user is merchant
+    if (isMerchant) {
+      message.error('Merchant users cannot edit delivery prices');
+      return;
+    }
+
+    try {
+      // Optimistic update in frontend
+      setData((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, delivery_price: newPrice } : item))
+      );
+  
+      // Send update to backend
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/delivery/update_delivery_price/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ delivery_price: parseFloat(newPrice) }),
+      });
+  
+      const result = await res.json();
+      if (!result.success) {
+        message.error('Failed to update delivery price');
+      }
+    } catch (err) {
+      message.error('Error updating delivery price');
+    }
+  };
+  
+  // 🔹 Fetch drivers once (only for non-merchant users)
+  useEffect(() => {
+    const fetchDrivers = async () => {
+      // Don't fetch drivers if user is merchant
+      if (isMerchant) return;
+      
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/user/merchant`);
+        const result = await res.json();
+        if (result.success) setDrivers(result.data);
+      } catch (err) {
+        message.error('Error fetching drivers');
+      }
+    };
+    fetchDrivers();
+  }, [isMerchant]);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams();
+
+      // ✅ If logged-in user is merchant, always fetch only their ID
+      if (isMerchant && user?.id) {
+        params.append('merchantId', user.id.toString());
+      } else if (merchantId) {
+        params.append('merchantId', merchantId.toString());
+      }
+
+      if (dateRange) {
+        params.append('startDate', dateRange[0]);
+        params.append('endDate', dateRange[1]);
+      }
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/merge_report/merchant?${params.toString()}`
+      );
+      const result = await res.json();
+      setData(result.success ? result.data : []);
+    } catch (err) {
+      message.error('Error fetching data');
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) { // Only fetch data when user data is available
+      fetchData();
+    }
+  }, [merchantId, dateRange, isMerchant, user]);
+
+  const handleMergeReport = async () => {
+    if (!merchantId) {
+      message.warning('Please select a merchant');
+      return;
+    }
+  
+    const selectedRows = data.filter((item) => selectedRowKeys.includes(item.id));
+    if (selectedRows.length === 0) {
+      message.warning('No deliveries selected');
+      return;
+    }
+  
+    const totalPrice = selectedRows.reduce(
+      (sum, item) => sum + parseFloat(item.price || '0'),
+      0
+    );
+    const totalDeliveryPrice = selectedRows.reduce(
+      (sum, item) => sum + parseFloat(item.delivery_price || '0'),
+      0
+    );
+    const netPrice = totalPrice - totalDeliveryPrice;
+  
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/general/merge_customer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          merchant_id: merchantId,
+          delivery_ids: selectedRows.map((item) => item.id),
+          count: selectedRows.length,
+          sum: netPrice,
+          status: 1,
+          type: 2,
+        }),
+      });
+  
+      const result = await res.json();
+      if (result.success) {
+        message.success('Deliveries merged successfully');
+  
+        // Update frontend to reflect report_stage = 2
+        setData((prev) =>
+          prev.map((item) =>
+            selectedRowKeys.includes(item.id) ? { ...item, report_stage: 2 } : item
+          )
+        );
+        setSelectedRowKeys([]);
+      } else {
+        message.error(result.message || 'Failed to merge deliveries');
+      }
+    } catch (err) {
+      console.error(err);
+      message.error('Error merging deliveries');
+    }
+  };
+  
+  const columns: ColumnsType<ReportData> = [
+    {
+      title: 'Хүргэсэн цаг',
+      dataIndex: 'delivered_at',
+      key: 'delivered_at',
+      render: (text: string) =>
+        text ? dayjs(text).tz('Asia/Ulaanbaatar').format('YYYY-MM-DD HH:mm:ss') : '-',
+    },
+    { title: 'Merchant', dataIndex: ['merchant', 'username'], key: 'merchant' },
+    { title: 'Phone', dataIndex: 'phone', key: 'phone' },
+    { title: 'Address', dataIndex: 'address', key: 'address' },
+    {
+      title: 'Price',
+      dataIndex: 'price',
+      key: 'price',
+      render: (text: string, record: ReportData) => (
+        isMerchant ? (
+          <span>{text}</span>
+        ) : (
+          <input
+            type="number"
+            value={text}
+            style={{ width: 100 }}
+            onChange={(e) => handlePriceChange(record.id, e.target.value)}
+          />
+        )
+      ),
+    },
+    {
+      title: 'Хүргэлтийн үнэ',
+      dataIndex: 'delivery_price',
+      key: 'delivery_price',
+      render: (text: string, record: ReportData) => (
+        isMerchant ? (
+          <span>{text}</span>
+        ) : (
+          <input
+            type="number"
+            value={text}
+            style={{ width: 100 }}
+            onChange={(e) => handleDeliveryPrice(record.id, e.target.value)}
+          />
+        )
+      ),
+    },
+    { title: 'Comment', dataIndex: 'comment', key: 'comment' },
+    { title: 'Driver', dataIndex: ['driver', 'username'], key: 'driver' },
+    {
+      title: 'Status',
+      dataIndex: ['status_name', 'status'],
+      key: 'status',
+      render: (_: string, record) => (
+        <Tag color={record.status_name?.color || 'blue'}>
+          {record.status_name?.status}
+        </Tag>
+      ),
+    },
+    { title: 'Delivery ID', dataIndex: 'delivery_id', key: 'delivery_id' },
+    {
+      title: 'Created At',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      render: (text: string) => new Date(text).toLocaleString(),
+    },
+  ];
+
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (newSelectedKeys: React.Key[]) => {
+      setSelectedRowKeys(newSelectedKeys);
+    },
+  };
+
+  const selectedItems = data.filter((item) => selectedRowKeys.includes(item.id));
+  const totalCount = selectedItems.length;
+  const totalPrice = selectedItems.reduce(
+    (sum, item) => sum + parseFloat(item.price || '0'),
+    0
+  );
+  const totalDeliveryPrice = selectedItems.reduce(
+    (sum, item) => sum + parseFloat(item.delivery_price || '0'),
+    0
+  );
+  const netPrice = totalPrice - totalDeliveryPrice;
+
+  return (
+    <div style={{ padding: 20 }}>
+      <h4 className="text-xl font-bold mb-4">Дэлгүүрийн тайлан</h4>
+
+      {/* Filters - Only show for non-merchant users */}
+      {!isMerchant && (
+        <Space style={{ marginBottom: 16 }}>
+          <Select
+            placeholder="Select Merchant"
+            style={{ width: 200 }}
+            allowClear
+            value={merchantId}
+            onChange={(value) => setMerchantId(value)}
+          >
+            {drivers.map((driver) => (
+              <Option key={driver.id} value={driver.id}>
+                {driver.username}
+              </Option>
+            ))}
+          </Select>
+
+          <RangePicker
+            onChange={(dates: RangePickerProps['value']) => {
+              if (dates) {
+                setDateRange([
+                  dayjs(dates[0]).startOf('day').toISOString(),
+                  dayjs(dates[1]).endOf('day').toISOString(),
+                ]);
+              } else {
+                setDateRange(undefined);
+              }
+            }}
+          />
+
+          <Button onClick={fetchData}>Apply Filters</Button>
+        </Space>
+      )}
+
+      {loading ? (
+        <Spin />
+      ) : (
+        <Table
+          rowSelection={rowSelection}
+          rowKey="id"
+          dataSource={data}
+          columns={columns}
+          pagination={{
+            pageSize: 100,
+            showSizeChanger: true,
+            pageSizeOptions: ['100', '200', '300', '500'],
+          }}
+        />
+      )}
+
+      {/* Fixed Footer */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          width: '100%',
+          background: '#fff',
+          padding: '16px 24px',
+          borderTop: '1px solid #ddd',
+          zIndex: 999,
+          display: 'flex',
+          gap: '16px',
+          alignItems: 'center',
+        }}
+      >
+        <span>
+          ✅ Selected Items: <b>{totalCount}</b>
+        </span>
+        <span>
+          💰 Total Price: <b>{totalPrice.toLocaleString()}₮</b>
+        </span>
+        <span>
+          🚚 Total Delivery Price: <b>{totalDeliveryPrice.toLocaleString()}₮</b>
+        </span>
+        <span>
+          🧾 Net Price: <b>{netPrice.toLocaleString()}₮</b>
+        </span>
+        {!isMerchant && (
+          <Button type="primary" onClick={handleMergeReport}>
+            Тайлан нийлэх
+          </Button>
+        )}
+        
+        <Button
+          type="default"
+          disabled={selectedRowKeys.length === 0}
+          onClick={() => {
+            const selectedRows = data.filter(item =>
+              selectedRowKeys.includes(item.id)
+            );
+
+            // Prepare data for Excel
+            const excelData = selectedRows.map(row => ({
+              'Дэлгүүр': row.merchant?.username ?? '-',
+              'Хаяг': row.address,
+              'Утас': row.phone,
+              'Үнэ': row.price,
+              'Хүргэлтийн үнэ': row.delivery_price,
+              'Тайлбар': row.comment ?? '-',
+              'Жолооч': row.driver?.username ?? '-',
+      
+            }));
+
+            // Convert to worksheet
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+            // Create workbook and add worksheet
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Selected Deliveries');
+
+            // Export Excel file
+            XLSX.writeFile(workbook, 'selected_deliveries.xlsx');
+          }}
+          style={{ marginLeft: 8 }}
+        >
+          Export Excel
+        </Button>
+      </div>
+    </div>
+  );
+}
