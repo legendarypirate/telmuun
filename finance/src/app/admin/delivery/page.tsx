@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo,useRef,useEffect } from 'react';
-import { Table, Button, Space, Input, DatePicker, Drawer, Form ,Select,Tag,Modal,Checkbox,message,InputNumber,List,Row,Col,Tooltip} from 'antd';
+import { Table, Button, Space, Input, DatePicker, Drawer, Form ,Select,Tag,Modal,App,Checkbox,message,InputNumber,List,Row,Col,Tooltip} from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { EditOutlined, DeleteOutlined,PlusOutlined, EyeOutlined} from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
@@ -120,6 +120,7 @@ const [deliveryDate, setDeliveryDate] = useState<Dayjs | null>(dayjs()); // Defa
   const [selectedStatuses, setSelectedStatuses] = useState<number[]>([]);
   const [selectedMerchantId, setSelectedMerchantId] = useState(merchantId || '');
   const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null);
+  const { modal, message: msg } = App.useApp();
 
   const [expandedRowKeys, setExpandedRowKeys] = React.useState<React.Key[]>([]);
   const [expandedItems, setExpandedItems] = React.useState<Record<number, Item[] | null>>({});
@@ -474,45 +475,49 @@ const fetchDrivers = async () => {
     // Шалгах: бүх сонгогдсон item-уудын статус 1 эсэх
     const selectedDeliveries = deliveryData.filter(item => selectedRowKeys.includes(item.id));
     const nonDeletable = selectedDeliveries.filter(item => item.status !== 1);
-  
+
     if (nonDeletable.length > 0) {
-      message.warning("Устгах боломжгүй хүргэлт байна.");
+      msg.warning("Устгах боломжгүй хүргэлт байна.");
       return;
     }
-  
-    Modal.confirm({
-      title: `Та ${selectedRowKeys.length} ширхэг хүргэлтийг устгахдаа итгэлтэй байна уу?`,
-      okText: "Тийм",
-      cancelText: "Үгүй",
-      onOk: async () => {
-        try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/delivery/delete-multiple`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ ids: selectedRowKeys }),
-          });
-  
-          if (!response.ok) throw new Error("Амжилтгүй боллоо");
-  
-          message.success("Амжилттай устгагдлаа");
-  
-          const refreshed = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/delivery`);
-          const refreshedResult = await refreshed.json();
-          if (refreshedResult.success) {
-            setDeliveryData(refreshedResult.data);
+
+    const keysToDelete = [...selectedRowKeys];
+    // Defer so modal opens after click handling (fixes production)
+    setTimeout(() => {
+      modal.confirm({
+        title: `Та ${keysToDelete.length} ширхэг хүргэлтийг устгахдаа итгэлтэй байна уу?`,
+        okText: "Тийм",
+        cancelText: "Үгүй",
+        onOk: async () => {
+          try {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/delivery/delete-multiple`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ ids: keysToDelete }),
+            });
+
+            if (!response.ok) throw new Error("Амжилтгүй боллоо");
+
+            msg.success("Амжилттай устгагдлаа");
+
+            const refreshed = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/delivery`);
+            const refreshedResult = await refreshed.json();
+            if (refreshedResult.success) {
+              setDeliveryData(refreshedResult.data);
+            }
+
+            form.resetFields();
+            setIsDrawerVisible(false);
+            setSelectedRowKeys([]);
+          } catch (error) {
+            const err = error as Error;
+            msg.error("Алдаа гарлаа: " + err.message);
           }
-  
-          form.resetFields();
-          setIsDrawerVisible(false);
-          setSelectedRowKeys([]);
-        }  catch (error) {
-          const err = error as Error;
-          message.error("Алдаа гарлаа: " + err.message);
-        }
-      },
-    });
+        },
+      });
+    }, 0);
   };
   
   const handleCheckboxChange = () => {

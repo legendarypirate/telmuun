@@ -10,6 +10,7 @@ import {
   Input,
   Select,
   Modal,
+  App,
   message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -21,7 +22,6 @@ import {
 } from '@ant-design/icons';
 
 const { Option } = Select;
-const { confirm } = Modal;
 
 interface User {
   id: number;
@@ -38,6 +38,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [form] = Form.useForm();
+  const { modal } = App.useApp();
 
   // Change password modal state
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
@@ -67,33 +68,37 @@ export default function UsersPage() {
   }, []);
 
 const handleDelete = (record: User) => {
-  confirm({
-    title: 'Устгахдаа итгэлтэй байна уу?',
-    icon: <ExclamationCircleOutlined />,
-    content: `"${record.username}" устгах`,
-    okText: 'Тийм',
-    okType: 'danger',
-    cancelText: 'Үгүй',
-    onOk: async () => {
-      try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/user/${record.id}`,
-          { method: 'DELETE' }
-        );
-        const json = await res.json();
+  const userToDelete = record;
+  // Defer so modal opens after click handling (fixes production)
+  setTimeout(() => {
+    modal.confirm({
+      title: 'Устгахдаа итгэлтэй байна уу?',
+      icon: <ExclamationCircleOutlined />,
+      content: `"${userToDelete.username}" устгах`,
+      okText: 'Тийм',
+      okType: 'danger',
+      cancelText: 'Үгүй',
+      onOk: async () => {
+        try {
+          const res = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/user/${userToDelete.id}`,
+            { method: 'DELETE' }
+          );
+          const json = await res.json();
 
-        if (json.success) {
-          message.success('Амжилттай устгалаа!');
-          fetchData();
-        } else {
-          message.error(json.message || 'Устгахад алдаа гарлаа');
+          if (json.success) {
+            message.success('Амжилттай устгалаа!');
+            fetchData();
+          } else {
+            message.error(json.message || 'Устгахад алдаа гарлаа');
+          }
+        } catch (err) {
+          console.error(err);
+          message.error('Устгахад алдаа гарлаа');
         }
-      } catch (err) {
-        console.error(err);
-        message.error('Устгахад алдаа гарлаа');
-      }
-    },
-  });
+      },
+    });
+  }, 0);
 };
 
 
