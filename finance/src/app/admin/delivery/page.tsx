@@ -114,7 +114,8 @@ const [deliveryDate, setDeliveryDate] = useState<Dayjs | null>(dayjs()); // Defa
   const username = typeof window !== 'undefined' ? localStorage.getItem('username') : null;
   const isNipponUser = username === 'Nippon clean tech home care LLC';
   const isAdminUser = username === 'admin';
-  const canUseExcelImport = hasPermission('delivery:excel_import_delivery') || isNipponUser || isAdminUser;
+  const canUseExcelImport =
+    permissions.includes('delivery:excel_import_delivery') || isNipponUser || isAdminUser;
   const [isEditModal, setIsEditModal] = useState(false);
   const [merchs, setMerchs] = useState<{ id: number; username: string }[]>([]);
 
