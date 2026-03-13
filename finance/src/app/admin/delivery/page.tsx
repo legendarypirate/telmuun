@@ -669,6 +669,7 @@ const processExcelFile = async (file: File) => {
       // Nippon user: Excel has 3 columns: phone, address, comment
       // Price must be 0 and merchant_id is Nippon's id (current user.id)
       // Also send merchantName so backend username lookup is not undefined
+      // Status must be 1 (шинэ)
       formatted = rows.map((row: any) => ({
         merchant_id: user?.id,
         merchantName: username || 'Nippon clean tech home care LLC',
@@ -676,15 +677,18 @@ const processExcelFile = async (file: File) => {
         address: row[1],
         price: 0,
         comment: row[2] ?? '',
+        status: 1,
       }));
     } else {
       // Default / admin logic: keep existing 5-column structure
+      // Explicitly set status 1 for imported deliveries
       formatted = rows.map((row: any) => ({
         merchantName: row[0],
         phone: row[1],
         address: row[2],
         price: row[3],
         comment: row[4],
+        status: 1,
       }));
     }
 
@@ -699,9 +703,12 @@ const processExcelFile = async (file: File) => {
     const result = await response.json();
     if (result.success) {
       alert(`${result.inserted || formatted.length} deliveries imported successfully.`);
-      const refreshed = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/delivery`);
-      const refreshedResult = await refreshed.json();
-      if (refreshedResult.success) setDeliveryData(refreshedResult.data);
+
+      // After import, show only today's data for this merchant
+      const todayStart = dayjs().startOf('day');
+      const todayEnd = dayjs().endOf('day');
+      setDateRange([todayStart, todayEnd]);
+      setRefreshKey((prev) => prev + 1);
     } else {
       alert('Import failed');
     }
