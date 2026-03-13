@@ -112,6 +112,9 @@ const [deliveryDate, setDeliveryDate] = useState<Dayjs | null>(dayjs()); // Defa
   const user = userData ? JSON.parse(userData) : null;
   const isMerchant = user?.role === 2;
   const username = typeof window !== 'undefined' ? localStorage.getItem('username') : null;
+  const isNipponUser = username === 'Nippon clean tech home care LLC';
+  const isAdminUser = username === 'admin';
+  const canUseExcelImport = hasPermission('delivery:excel_import_delivery') || isNipponUser || isAdminUser;
   const [isEditModal, setIsEditModal] = useState(false);
   const [merchs, setMerchs] = useState<{ id: number; username: string }[]>([]);
 
@@ -658,13 +661,29 @@ const processExcelFile = async (file: File) => {
     const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
     const rows = json.slice(1); // Skip header row
-    const formatted = rows.map((row: any) => ({
-      merchantName: row[0],
-      phone: row[1],
-      address: row[2],
-      price: row[3],
-      comment: row[4],
-    }));
+
+    let formatted: any[] = [];
+
+    if (isNipponUser) {
+      // Nippon user: Excel has 3 columns: phone, address, comment
+      // Price must be 0 and merchant_id is Nippon's id (current user.id)
+      formatted = rows.map((row: any) => ({
+        merchant_id: user?.id,
+        phone: row[0],
+        address: row[1],
+        price: 0,
+        comment: row[2] ?? '',
+      }));
+    } else {
+      // Default / admin logic: keep existing 5-column structure
+      formatted = rows.map((row: any) => ({
+        merchantName: row[0],
+        phone: row[1],
+        address: row[2],
+        price: row[3],
+        comment: row[4],
+      }));
+    }
 
     console.log('Parsed Excel:', formatted);
 
@@ -973,7 +992,12 @@ const handeStatusChange = async () => {
         ))}
       </Select>
 
-      {/* Import Excel Button */}
+    </>
+  )}
+
+  {/* Excel Import button available for Nippon, admin or users with permission */}
+  {canUseExcelImport && (
+    <>
       <div
         onClick={() => fileInputRef.current?.click()}
         onDragOver={(e) => e.preventDefault()}
