@@ -668,8 +668,10 @@ const processExcelFile = async (file: File) => {
     if (isNipponUser) {
       // Nippon user: Excel has 3 columns: phone, address, comment
       // Price must be 0 and merchant_id is Nippon's id (current user.id)
+      // Also send merchantName so backend username lookup is not undefined
       formatted = rows.map((row: any) => ({
         merchant_id: user?.id,
+        merchantName: username || 'Nippon clean tech home care LLC',
         phone: row[0],
         address: row[1],
         price: 0,
