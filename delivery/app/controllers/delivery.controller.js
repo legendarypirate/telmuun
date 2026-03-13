@@ -649,18 +649,18 @@ exports.findAll = async (req, res) => {
     if (phone) where.phone = { [Op.like]: `%${phone}%` };
     if (statusIds.length > 0) where.status = { [Op.in]: statusIds };
 
-    // --- Date Filtering (scheduled_delivery_date) ---
+    // --- Date Filtering (createdAt) ---
     let filterStart, filterEnd;
 
     if (start_date && end_date) {
-      // Range selected → filter by scheduled_delivery_date
+      // Range selected → filter by createdAt
       filterStart = new Date(start_date);
       filterStart.setHours(0, 0, 0, 0);
 
       filterEnd = new Date(end_date);
       filterEnd.setHours(23, 59, 59, 999);
     } else {
-      // No range → default = today (UB timezone)
+      // No range → default = today (UB timezone), by createdAt
       const UBTime = new Date(
         new Date().toLocaleString('en-US', { timeZone: 'Asia/Ulaanbaatar' })
       );
@@ -672,7 +672,8 @@ exports.findAll = async (req, res) => {
       filterEnd.setHours(23, 59, 59, 999);
     }
 
-    where.scheduled_delivery_date = { [Op.between]: [filterStart, filterEnd] };
+    // Filter by creation time so merchants see deliveries created "today"
+    where.createdAt = { [Op.between]: [filterStart, filterEnd] };
 
     // Query
     const { count, rows } = await Delivery.findAndCountAll({
