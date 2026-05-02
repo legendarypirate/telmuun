@@ -39,6 +39,7 @@ interface Delivery {
     username: string;
   };
   createdAt: string;
+  delivered_at?: string | null;
   merchant: {
     username: string;
   };
@@ -1384,7 +1385,8 @@ onClick={() => {
         <thead>
           <tr>
             <th>ID</th>
-
+            <th>Үүссэн огноо</th>
+            <th>Хүргэсэн огноо</th>
             <th>Merchant</th>
             <th>Address</th>
             <th>Phone</th>
@@ -1400,7 +1402,8 @@ onClick={() => {
       printWindow.document.write(`
         <tr>
           <td>${row.id}</td>
-
+          <td>${row.createdAt ? dayjs(row.createdAt).format('YYYY-MM-DD hh:mm A') : '-'}</td>
+          <td>${row.delivered_at ? dayjs(row.delivered_at).format('YYYY-MM-DD hh:mm A') : '-'}</td>
           <td>${row.merchant?.username ?? '-'}</td>
           <td>${row.address}</td>
           <td>${row.phone}</td>
