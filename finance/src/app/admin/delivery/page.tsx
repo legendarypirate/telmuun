@@ -1298,7 +1298,7 @@ expandable={{
   </Form>
 </Drawer>
       {/* Fixed Bottom Section */}
-      {hasPermission('delivery:excel_import_delivery') && (
+      {(isMerchant || hasPermission('delivery:excel_import_delivery')) && (
 
       <div style={{ position: 'fixed', bottom: 0, left: 0, width: '100%', background: '#fff', padding: '16px 24px', borderTop: '1px solid #ddd', zIndex: 999 }}>
         <Space style={{ marginRight: 16 }}>
@@ -1316,6 +1316,8 @@ expandable={{
 
         )}
       </div>
+          {hasPermission('delivery:excel_import_delivery') && (
+          <>
           <Button
             type="primary"
             onClick={handleAllocateToDriver}
@@ -1474,6 +1476,8 @@ const excelData = selectedRows.map(row => ({
 >
   Export Excel
 </Button>
+          </>
+          )}
 
         </Space>
         

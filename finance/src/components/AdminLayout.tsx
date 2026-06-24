@@ -86,6 +86,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     message.success('Амжилттай гарлаа');
     localStorage.removeItem('user');
     localStorage.removeItem('token');
+    localStorage.removeItem('permissions');
+    localStorage.removeItem('role');
+    localStorage.removeItem('username');
     router.push('/');
   };
 
@@ -100,17 +103,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     });
   };
 
-  const userMenu = (
-    <Menu>
-      <Menu.Item key="userinfo" icon={<UserOutlined />} disabled>
-        Таны нэр: {userName}
-      </Menu.Item>
-      <Menu.Divider />
-      <Menu.Item key="logout" icon={<LogoutOutlined />} onClick={showConfirm} danger>
-        Гарах
-      </Menu.Item>
-    </Menu>
-  );
+  const userMenuItems: MenuProps['items'] = [
+    {
+      key: 'userinfo',
+      icon: <UserOutlined />,
+      label: `Таны нэр: ${userName}`,
+      disabled: true,
+    },
+    { type: 'divider' },
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: 'Гарах',
+      danger: true,
+      onClick: showConfirm,
+    },
+  ];
 
   const handleMenuClick: MenuProps['onClick'] = (e) => {
     setLoading(true);
@@ -212,7 +220,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     alignItems: 'center',
   }}
 >
-  <Dropdown overlay={userMenu} trigger={['click']} placement="bottomRight" arrow>
+  <Dropdown menu={{ items: userMenuItems }} trigger={['click']} placement="bottomRight" arrow>
     <Avatar
       size="large"
       style={{ cursor: 'pointer', backgroundColor: '#fff', color: '#0e9c94' }}
