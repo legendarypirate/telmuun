@@ -4,6 +4,10 @@ const User = db.users;
 const Status = db.statuses;
 const Op = db.Sequelize.Op;
 const { fn, col, literal } = db.Sequelize;
+
+const notDeleted = {
+  [Op.or]: [{ is_deleted: false }, { is_deleted: null }],
+};
 const DeliveryItem = db.delivery_items;
 const Goods=db.goods;
 const path = require('path');
@@ -16,7 +20,8 @@ exports.findDriverDeliveriesWithStatus = (req, res) => {
   Delivery.findAll({
     where: {
       driver_id: driverId,
-      status: 2
+      status: 2,
+      ...notDeleted,
     },
     include: [
       {
@@ -52,7 +57,7 @@ exports.addDriverComment = async (req, res) => {
     // Sequelize update гэж үзэж байна
     const [updated] = await Delivery.update(
       { driver_comment },
-      { where: { id: deliveryId } }
+      { where: { id: deliveryId, ...notDeleted } }
     );
 
     if (updated) {
@@ -68,7 +73,7 @@ exports.addDriverComment = async (req, res) => {
 
 exports.findUserDeliveries = (req, res) => {
     const userId = req.query.user_id;
-    Delivery.findAll({ where: { driver_id: userId } })
+    Delivery.findAll({ where: { driver_id: userId, ...notDeleted } })
         .then(data => res.send(data))
         .catch(err => res.status(500).send({ message: err.message }));
 };
@@ -81,7 +86,7 @@ exports.findMerchantDelivery = (req, res) => {
     return res.status(400).send({ success: false, message: "Missing user_id" });
   }
 
-  Delivery.findAll({ where: { merchant_id: userId } })
+  Delivery.findAll({ where: { merchant_id: userId, ...notDeleted } })
     .then(data => res.send({ success: true, data }))
     .catch(err =>
       res.status(500).send({ success: false, message: err.message })
@@ -95,7 +100,8 @@ exports.findDeliveryDone = (req, res) => {
   // Build where clause
   const whereClause = {
     driver_id: driverId,
-    status: { [Op.in]: [3, 4, 5] }
+    status: { [Op.in]: [3, 4, 5] },
+    ...notDeleted,
   };
 
   // Add date range if both start and end dates are provided
@@ -128,8 +134,7 @@ exports.findByDeliverId = async (req, res) => {
   
     try {
       const delivery = await Delivery.findOne({
-        where: { delivery_id: deliveryId },
-        
+        where: { delivery_id: deliveryId, ...notDeleted },
       });
   
       if (!delivery) {
@@ -163,6 +168,7 @@ exports.findByDeliverId = async (req, res) => {
               WHERE d.status = status.id
                 AND d.driver_id = ${driverId}
                 AND d."createdAt" BETWEEN '${startOfDay.toISOString()}' AND '${endOfDay.toISOString()}'
+                AND (d.is_deleted = false OR d.is_deleted IS NULL)
             )`),
             'count'
           ]
@@ -180,7 +186,7 @@ exports.findByDeliverId = async (req, res) => {
     const { driver_id, start_date, end_date } = req.query; // or req.body
   
     // Build dynamic WHERE clause
-    const whereClause = {};
+    const whereClause = { ...notDeleted };
   
     if (driver_id) {
       whereClause.driver_id = driver_id;
@@ -236,7 +242,10 @@ exports.findByDeliverId = async (req, res) => {
   const t = await db.sequelize.transaction();
 
   try {
-    const delivery = await Delivery.findByPk(id, { transaction: t });
+    const delivery = await Delivery.findOne({
+      where: { id, ...notDeleted },
+      transaction: t,
+    });
     if (!delivery) {
       await t.rollback();
       return res.status(404).send({

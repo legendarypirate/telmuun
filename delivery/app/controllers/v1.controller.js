@@ -207,7 +207,10 @@ exports.checkOrder = (req, res) => {
   const orderId = req.params.id;
 
   Delivery.findOne({
-    where: { id: orderId },
+    where: {
+      id: orderId,
+      [Op.or]: [{ is_deleted: false }, { is_deleted: null }],
+    },
     order: [['createdAt', 'DESC']]
   })
     .then(data => {
