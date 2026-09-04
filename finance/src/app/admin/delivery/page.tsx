@@ -498,8 +498,8 @@ export default function DeliveryPage() {
               <TableHead className="min-w-[180px] max-w-[280px] whitespace-normal">Хаяг / Утас</TableHead>
               <TableHead>Төлөв</TableHead>
               <TableHead>Үнэ</TableHead>
-              <TableHead>Тайлбар</TableHead>
-              <TableHead>Ж/тайлбар</TableHead>
+              <TableHead className="min-w-[140px] max-w-[240px] whitespace-normal">Тайлбар</TableHead>
+              <TableHead className="min-w-[140px] max-w-[240px] whitespace-normal">Ж/тайлбар</TableHead>
               {!isMerchant && <TableHead>Жолооч</TableHead>}
               {!isMerchant && <TableHead>Үйлдэл</TableHead>}
             </TableRow>
@@ -531,8 +531,12 @@ export default function DeliveryPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>{Number(record.price || 0).toLocaleString()} ₮</TableCell>
-                  <TableCell>{record.comment}</TableCell>
-                  <TableCell>{record.driver_comment || "-"}</TableCell>
+                  <TableCell className="max-w-[240px] whitespace-normal align-top break-words">
+                    {record.comment}
+                  </TableCell>
+                  <TableCell className="max-w-[240px] whitespace-normal align-top break-words">
+                    {record.driver_comment || "-"}
+                  </TableCell>
                   {!isMerchant && <TableCell>{record.driver?.username || "-"}</TableCell>}
                   {!isMerchant && (
                     <TableCell>
