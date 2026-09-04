@@ -31,10 +31,16 @@ db.sequelize.sync()
   .then(async () => {
     try {
       await db.sequelize.query(
-        'ALTER TABLE users ADD COLUMN IF NOT EXISTS report_price INTEGER DEFAULT 7000'
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS report_price INTEGER DEFAULT 7000"
+      );
+      await db.sequelize.query(
+        "ALTER TABLE goods ADD COLUMN IF NOT EXISTS in_delivery INTEGER DEFAULT 0"
+      );
+      await db.sequelize.query(
+        "ALTER TABLE goods ADD COLUMN IF NOT EXISTS delivered INTEGER DEFAULT 0"
       );
     } catch (err) {
-      console.log("report_price column check:", err.message);
+      console.log("column check:", err.message);
     }
     console.log("Synced db.");
   })
