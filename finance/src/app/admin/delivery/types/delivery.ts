@@ -31,6 +31,7 @@ export interface Delivery {
   createdAt: string;
   delivered_at?: string;
   delivery_date?: string;
+  district_id?: number | null;
   merchant?: {
     id?: number;
     username: string;

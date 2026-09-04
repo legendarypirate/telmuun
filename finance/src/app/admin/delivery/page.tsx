@@ -33,7 +33,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { formatDateLocal } from "@/lib/utils";
+import { formatDateLocal, getTodayLocal } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { useDrivers, useMerchants, useStatuses } from "@/hooks/use-lookups";
 import { queryKeys } from "@/lib/api";
@@ -73,6 +73,7 @@ interface Delivery {
   driver?: { username: string };
   createdAt: string;
   delivered_at?: string | null;
+  delivery_date?: string | null;
   merchant?: { username: string };
   status_name?: { status: string; color: string };
   postponed_number?: number;
@@ -123,6 +124,8 @@ export default function DeliveryPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isAllocateOpen, setIsAllocateOpen] = useState(false);
+  const [isDeliveryDateOpen, setIsDeliveryDateOpen] = useState(false);
+  const [bulkDeliveryDate, setBulkDeliveryDate] = useState(getTodayLocal());
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [isImageOpen, setIsImageOpen] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
@@ -138,8 +141,9 @@ export default function DeliveryPage() {
     price: "",
     comment: "",
     districtId: "",
+    deliveryDate: getTodayLocal(),
   });
-  const [editForm, setEditForm] = useState({ phone: "", address: "", price: "", districtId: "" });
+  const [editForm, setEditForm] = useState({ phone: "", address: "", price: "", districtId: "", deliveryDate: "" });
   const [pullFromWarehouse, setPullFromWarehouse] = useState(false);
   const [products, setProducts] = useState<{ id: string; name: string }[]>([]);
   const [productList, setProductList] = useState<
@@ -409,6 +413,7 @@ export default function DeliveryPage() {
       price: createForm.price ? Number(createForm.price) : 0,
       comment: createForm.comment || "",
       district_id: Number(createForm.districtId),
+      delivery_date: createForm.deliveryDate || getTodayLocal(),
       items: productList.map((item) => ({ good_id: item.productId, quantity: item.quantity })),
     };
     const res = await fetch(`${API}/api/delivery`, {
@@ -420,7 +425,7 @@ export default function DeliveryPage() {
     if (result.success) {
       toast.success("Амжилттай бүртгэгдлээ");
       setIsDrawerOpen(false);
-      setCreateForm({ merchantId: "", phone: "", address: "", price: "", comment: "", districtId: "" });
+      setCreateForm({ merchantId: "", phone: "", address: "", price: "", comment: "", districtId: "", deliveryDate: getTodayLocal() });
       setProductList([]);
       setRefreshKey((k) => k + 1);
     } else {
@@ -438,6 +443,7 @@ export default function DeliveryPage() {
         address: editForm.address,
         price: Number(editForm.price) || 0,
         district_id: editForm.districtId ? Number(editForm.districtId) : null,
+        delivery_date: editForm.deliveryDate || null,
       }),
     });
     const result = await res.json();
@@ -469,6 +475,27 @@ export default function DeliveryPage() {
     setIsDeleteOpen(false);
     setSelectedRowKeys([]);
     setRefreshKey((k) => k + 1);
+  };
+
+  const handleSaveDeliveryDate = async () => {
+    if (!bulkDeliveryDate) {
+      toast.warning("Огноо сонгоно уу!");
+      return;
+    }
+    const res = await fetch(`${API}/api/delivery/update-delivery-dates`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ delivery_date: bulkDeliveryDate, delivery_ids: selectedRowKeys }),
+    });
+    const result = await res.json();
+    if (result.success) {
+      toast.success("Хүргэх огноо шинэчлэгдлээ");
+      setIsDeliveryDateOpen(false);
+      setSelectedRowKeys([]);
+      setRefreshKey((k) => k + 1);
+    } else {
+      toast.error(result.message || "Огноо өөрчлөхөд алдаа гарлаа");
+    }
   };
 
   const handleAllocate = async () => {
@@ -571,7 +598,10 @@ export default function DeliveryPage() {
     <div className="px-6 pt-6 pb-32">
       <div className="mb-8 flex items-center justify-between">
         <h1 className="text-3xl font-bold">Хүргэлт</h1>
-        <Button onClick={() => setIsDrawerOpen(true)}>
+        <Button onClick={() => {
+          setCreateForm((p) => ({ ...p, deliveryDate: getTodayLocal() }));
+          setIsDrawerOpen(true);
+        }}>
           <Plus className="h-4 w-4" /> Хүргэлт нэмэх
         </Button>
       </div>
@@ -638,8 +668,8 @@ export default function DeliveryPage() {
           <TableHeader>
             <TableRow>
               <TableHead className="w-10"><Checkbox checked={deliveryData.length > 0 && selectedRowKeys.length === deliveryData.length} onCheckedChange={toggleAll} /></TableHead>
-              <TableHead>Үүссэн огноо</TableHead>
-              <TableHead>Хүргэсэн огноо</TableHead>
+              <TableHead>Шивсэн огноо</TableHead>
+              <TableHead>Хүргэх огноо</TableHead>
               {!isMerchant && <TableHead>Дэлгүүр</TableHead>}
               <TableHead>Дүүрэг</TableHead>
               <TableHead className="min-w-[180px] max-w-[280px] whitespace-normal">Хаяг / Утас</TableHead>
@@ -661,7 +691,11 @@ export default function DeliveryPage() {
                 <TableRow>
                   <TableCell><Checkbox checked={selectedRowKeys.includes(record.id)} onCheckedChange={() => toggleRow(record.id)} /></TableCell>
                   <TableCell className="text-xs">{dayjs(record.createdAt).format("YYYY-MM-DD HH:mm")}</TableCell>
-                  <TableCell className="text-xs">{record.delivered_at ? dayjs(record.delivered_at).format("YYYY-MM-DD HH:mm") : "-"}</TableCell>
+                  <TableCell className="text-xs">
+                    {record.delivery_date
+                      ? dayjs(record.delivery_date).format("YYYY-MM-DD")
+                      : dayjs(record.createdAt).format("YYYY-MM-DD")}
+                  </TableCell>
                   {!isMerchant && <TableCell>{record.merchant?.username || "-"}</TableCell>}
                   <TableCell>{districtName(record.district_id)}</TableCell>
                   <TableCell className="max-w-[280px] whitespace-normal align-top">
@@ -696,6 +730,9 @@ export default function DeliveryPage() {
                             address: record.address,
                             price: String(record.price ?? ""),
                             districtId: record.district_id ? String(record.district_id) : "",
+                            deliveryDate: record.delivery_date
+                              ? dayjs(record.delivery_date).format("YYYY-MM-DD")
+                              : dayjs(record.createdAt).format("YYYY-MM-DD"),
                           });
                           setIsEditOpen(true);
                         }}><Edit className="h-4 w-4" /></Button>
@@ -753,6 +790,10 @@ export default function DeliveryPage() {
             <>
               <Button onClick={() => setIsAllocateOpen(true)}>Жолоочид хуваарилах</Button>
               <Button variant="destructive" onClick={() => setIsDeleteOpen(true)}><Trash2 className="h-4 w-4" /> Устгах</Button>
+              <Button variant="outline" onClick={() => {
+                setBulkDeliveryDate(getTodayLocal());
+                setIsDeliveryDateOpen(true);
+              }}>Хүргэх огноо тохируулах</Button>
               <Button variant="outline" onClick={async () => {
                 const res = await fetch(`${API}/api/status`);
                 const result = await res.json();
@@ -762,6 +803,10 @@ export default function DeliveryPage() {
                 const selectedRows = deliveryData.filter((item) => selectedRowKeys.includes(item.id));
                 const excelData = selectedRows.map((row) => ({
                   ID: row.id,
+                  "Шивсэн огноо": dayjs(row.createdAt).format("YYYY-MM-DD HH:mm"),
+                  "Хүргэх огноо": row.delivery_date
+                    ? dayjs(row.delivery_date).format("YYYY-MM-DD")
+                    : dayjs(row.createdAt).format("YYYY-MM-DD"),
                   Дэлгүүр: row.merchant?.username ?? "-",
                   Дүүрэг: districtName(row.district_id),
                   Хаяг: row.address,
@@ -806,6 +851,10 @@ export default function DeliveryPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Хүргэх огноо</Label>
+              <Input type="date" value={createForm.deliveryDate} onChange={(e) => setCreateForm((p) => ({ ...p, deliveryDate: e.target.value }))} />
             </div>
             <div className="space-y-2"><Label>Хаяг</Label><Input value={createForm.address} onChange={(e) => setCreateForm((p) => ({ ...p, address: e.target.value }))} /></div>
             <div className="space-y-2"><Label>Үнэ</Label><Input type="number" value={createForm.price} onChange={(e) => setCreateForm((p) => ({ ...p, price: e.target.value }))} /></div>
@@ -864,6 +913,10 @@ export default function DeliveryPage() {
               </Select>
             </div>
             <div className="space-y-2"><Label>Хаяг</Label><Input value={editForm.address} onChange={(e) => setEditForm((p) => ({ ...p, address: e.target.value }))} /></div>
+            <div className="space-y-2">
+              <Label>Хүргэх огноо</Label>
+              <Input type="date" value={editForm.deliveryDate} onChange={(e) => setEditForm((p) => ({ ...p, deliveryDate: e.target.value }))} />
+            </div>
             <div className="space-y-2"><Label>Үнэ</Label><Input type="number" value={editForm.price} onChange={(e) => setEditForm((p) => ({ ...p, price: e.target.value }))} /></div>
           </div>
           <DialogFooter>
@@ -879,6 +932,25 @@ export default function DeliveryPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>Үгүй</Button>
             <Button variant="destructive" onClick={handleDelete}>Тийм</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeliveryDateOpen} onOpenChange={setIsDeliveryDateOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Хүргэх огноо тохируулах</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="bulk-delivery_date">Хүргэх огноо *</Label>
+            <Input
+              id="bulk-delivery_date"
+              type="date"
+              value={bulkDeliveryDate}
+              onChange={(e) => setBulkDeliveryDate(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeliveryDateOpen(false)}>Цуцлах</Button>
+            <Button onClick={handleSaveDeliveryDate}>Хадгалах</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -13,6 +13,7 @@ module.exports = app => {
     router.post("/delete-multiple", delivery.deleteMultiple);
 
     router.post("/allocate", delivery.allocateDeliveries);
+    router.post("/update-delivery-dates", delivery.updateDeliveryDates);
     router.get("/findAllWithDate", delivery.findAllWithDate);
 
     router.post("/status", delivery.status);

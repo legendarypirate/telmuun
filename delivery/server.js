@@ -42,6 +42,14 @@ db.sequelize.sync()
       await db.sequelize.query(
         "ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS district_id INTEGER DEFAULT NULL"
       );
+      await db.sequelize.query(
+        "ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS delivery_date DATE DEFAULT NULL"
+      );
+      await db.sequelize.query(`
+        UPDATE deliveries
+        SET delivery_date = (("createdAt")::timestamptz AT TIME ZONE 'Asia/Ulaanbaatar')::date
+        WHERE delivery_date IS NULL
+      `);
     } catch (err) {
       console.log("column check:", err.message);
     }

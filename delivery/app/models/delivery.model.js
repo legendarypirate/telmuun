@@ -93,11 +93,25 @@ postponed_number: {
       allowNull: true,
       defaultValue: null,
     },
+    delivery_date: {
+      type: Sequelize.DATEONLY,
+      allowNull: true,
+      defaultValue: null,
+    },
   }, {
     // REMOVE the hooks section completely or modify it
     // Only set scheduled_delivery_date when NOT provided
     hooks: {
       beforeCreate: async (delivery) => {
+        if (!delivery.delivery_date) {
+          const ub = new Date(
+            new Date().toLocaleString('en-US', { timeZone: 'Asia/Ulaanbaatar' })
+          );
+          const y = ub.getFullYear();
+          const m = String(ub.getMonth() + 1).padStart(2, '0');
+          const d = String(ub.getDate()).padStart(2, '0');
+          delivery.delivery_date = `${y}-${m}-${d}`;
+        }
         // Only set if not already provided
         if (!delivery.scheduled_delivery_date) {
           const cutOffHour = 12; // 12:00 PM

@@ -413,6 +413,7 @@ exports.create = async (req, res) => {
       comment,
       scheduled_delivery_date: scheduledDate, // <-- EXACT logic implemented
       district_id: req.body.district_id ? Number(req.body.district_id) : null,
+      delivery_date: req.body.delivery_date || null,
     };
 
     const delivery = await Delivery.create(newDel, { transaction: t });
@@ -583,6 +584,35 @@ exports.importExcelDeliveries = async (req, res) => {
 
   //80989497
 
+exports.updateDeliveryDates = async (req, res) => {
+  const { delivery_date, delivery_ids } = req.body;
+
+  if (!delivery_date || !Array.isArray(delivery_ids) || delivery_ids.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Delivery date and a list of delivery IDs are required.",
+    });
+  }
+
+  try {
+    await Delivery.update(
+      { delivery_date },
+      { where: { id: delivery_ids } }
+    );
+
+    res.json({
+      success: true,
+      message: "Delivery dates updated successfully.",
+    });
+  } catch (error) {
+    console.error("Error updating delivery dates:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while updating delivery dates.",
+    });
+  }
+};
+
  exports.allocateDeliveries = async (req, res) => {
     const { driver_id, delivery_ids, delivery_date } = req.body;
   
@@ -651,31 +681,21 @@ exports.findAll = async (req, res) => {
     if (statusIds.length > 0) where.status = { [Op.in]: statusIds };
     if (district_id) where.district_id = Number(district_id);
 
-    // --- Date Filtering (createdAt) ---
-    let filterStart, filterEnd;
+    // --- Date Filtering (delivery_date, like mgl) ---
+    const ubNow = new Date(
+      new Date().toLocaleString('en-US', { timeZone: 'Asia/Ulaanbaatar' })
+    );
+    const todayUB = `${ubNow.getFullYear()}-${String(ubNow.getMonth() + 1).padStart(2, '0')}-${String(ubNow.getDate()).padStart(2, '0')}`;
 
     if (start_date && end_date) {
-      // Range selected → filter by createdAt
-      filterStart = new Date(start_date);
-      filterStart.setHours(0, 0, 0, 0);
-
-      filterEnd = new Date(end_date);
-      filterEnd.setHours(23, 59, 59, 999);
+      where.delivery_date = { [Op.between]: [start_date, end_date] };
+    } else if (start_date) {
+      where.delivery_date = { [Op.gte]: start_date };
+    } else if (end_date) {
+      where.delivery_date = { [Op.lte]: end_date };
     } else {
-      // No range → default = today (UB timezone), by createdAt
-      const UBTime = new Date(
-        new Date().toLocaleString('en-US', { timeZone: 'Asia/Ulaanbaatar' })
-      );
-
-      filterStart = new Date(UBTime);
-      filterStart.setHours(0, 0, 0, 0);
-
-      filterEnd = new Date(UBTime);
-      filterEnd.setHours(23, 59, 59, 999);
+      where.delivery_date = todayUB;
     }
-
-    // Filter by creation time so merchants see deliveries created "today"
-    where.createdAt = { [Op.between]: [filterStart, filterEnd] };
 
     // Cap page size so a huge limit cannot lock the DB. Keep 1000 (admin UI max).
     const safeLimit = Math.min(Math.max(limit, 1), 1000);
@@ -909,7 +929,7 @@ exports.update = (req, res) => {
   const id = req.params.id;
 
   // Validate request (ensure at least one field is provided)
-  if (!req.body.phone && !req.body.address && req.body.price === undefined && req.body.district_id === undefined) {
+  if (!req.body.phone && !req.body.address && req.body.price === undefined && req.body.district_id === undefined && !req.body.delivery_date) {
     return res.status(400).json({
       success: false,
       message: "Request body cannot be empty. At least phone, address, or price is required.",
@@ -925,6 +945,9 @@ exports.update = (req, res) => {
   if (req.body.price !== undefined) updateData.price = req.body.price;
   if (req.body.district_id !== undefined) {
     updateData.district_id = req.body.district_id ? Number(req.body.district_id) : null;
+  }
+  if (req.body.delivery_date !== undefined) {
+    updateData.delivery_date = req.body.delivery_date || null;
   }
 
   // Update the delivery entry in the database
