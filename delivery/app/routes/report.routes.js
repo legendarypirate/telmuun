@@ -2,9 +2,9 @@ module.exports = app => {
     const report = require("../controllers/report.controller.js");
   
     var router = require("express").Router();
+    router.get("/driver-stats", report.getDriverStatusStats);
+    router.post("/send-merchant-emails", report.sendMerchantReportEmails);
     router.get("/:id/deliveries", report.findDeliveriesByReportId);
-
-    // Create a new Tutorial
     router.post("/driver", report.getTotalPriceByDriverAndDate);
   
     // Retrieve all Tutorials

@@ -308,6 +308,71 @@ exports.deleteAll = (req, res) => {
     });
 };
 
+exports.getDriverStatusStats = async (req, res) => {
+  const { driver_id, start_date, end_date } = req.query;
+  try {
+    const where = {
+      [Op.or]: [{ is_deleted: false }, { is_deleted: null }],
+    };
+    if (driver_id) where.driver_id = parseInt(driver_id, 10);
+    if (start_date && end_date) {
+      where.createdAt = {
+        [Op.between]: [new Date(start_date + "T00:00:00"), new Date(end_date + "T23:59:59")],
+      };
+    } else if (start_date) {
+      where.createdAt = { [Op.gte]: new Date(start_date + "T00:00:00") };
+    } else if (end_date) {
+      where.createdAt = { [Op.lte]: new Date(end_date + "T23:59:59") };
+    }
+
+    const [statuses, deliveries] = await Promise.all([
+      Status.findAll({ order: [["id", "ASC"]] }),
+      Delivery.findAll({
+        where,
+        attributes: ["driver_id", "status"],
+        include: [{ model: User, as: "driver", attributes: ["id", "username"], required: false }],
+      }),
+    ]);
+
+    const driverMap = {};
+    deliveries.forEach((delivery) => {
+      const row = delivery.toJSON();
+      const driverId = row.driver_id ?? 0;
+      const driverName = row.driver?.username || "Тодорхойгүй";
+      if (!driverMap[driverId]) {
+        driverMap[driverId] = { driver_id: driverId, driver_name: driverName, status_counts: {}, total: 0 };
+      }
+      const statusId = String(row.status);
+      driverMap[driverId].status_counts[statusId] = (driverMap[driverId].status_counts[statusId] || 0) + 1;
+      driverMap[driverId].total += 1;
+    });
+
+    const data = Object.values(driverMap)
+      .map((row) => {
+        const deliveredCount = row.status_counts["3"] || 0;
+        return {
+          ...row,
+          delivered_count: deliveredCount,
+          delivered_percentage: row.total > 0 ? Math.round((deliveredCount / row.total) * 10000) / 100 : 0,
+        };
+      })
+      .sort((a, b) => a.driver_name.localeCompare(b.driver_name, "mn"));
+
+    res.json({ success: true, data, statuses: statuses.map((s) => s.toJSON()) });
+  } catch (error) {
+    console.error("getDriverStatusStats error:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch driver status statistics.", error: error.message });
+  }
+};
+
+exports.sendMerchantReportEmails = async (req, res) => {
+  res.json({
+    success: false,
+    message: "Имэйл илгээх тохиргоо энэ орчинд идэвхжээгүй байна.",
+    results: [],
+  });
+};
+
 // find all published Categories
 exports.findAllPublished = (req, res) => {
   category.findAll({ where: { published: true } })

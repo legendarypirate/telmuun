@@ -1,226 +1,176 @@
-'use client';
+"use client";
 
-import React, { useState, useMemo,useRef,useEffect } from 'react';
-import { Table, Button, Space, Input, Drawer, Form ,Select} from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import React, { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useNotifications } from "@/hooks/use-lookups";
+import { queryKeys } from "@/lib/api";
+import dayjs from "dayjs";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
-import dayjs, { Dayjs } from 'dayjs';
-import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
-import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
-
-dayjs.extend(isSameOrAfter);
-dayjs.extend(isSameOrBefore);
 interface Notification {
   id: number;
   type: number;
   title: string;
   body: string;
-
+  createdAt?: string;
 }
 
-
-const columns: ColumnsType<Notification> = [
-  {
-    title: 'Үүссэн огноо',
-    dataIndex: 'createdAt',
-    render: (text: string) => {
-      return dayjs(text).format('YYYY-MM-DD hh:mm A'); // Format the date here
-    },
-  },
-  {
-    title: 'Төрөл',
-    dataIndex: 'type',
-    render: (type: number) => (type === 1 ? 'Харилцагч' : 'Жолооч'),
-  },  
-  { title: 'Гарчиг', dataIndex: 'title' },
-  { title: 'Мэдээлэл', dataIndex: 'body' },
-
-];
-
-export default function DeliveryPage() {
-  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
-  const [merchantFilter, setMerchantFilter] = useState('');
-  const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([null, null]);
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [form] = Form.useForm();
+export default function NotificationPage() {
+  const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([]);
   const [isDrawerVisible, setIsDrawerVisible] = useState(false);
-  const [merchants, setMerchants] = useState<{ id: number; username: string }[]>([]);
-  const [regionData, setRegionData] = useState<Notification[]>([]);
-  const [drivers, setDrivers] = useState<{ id: number; username: string }[]>([]);
-  const [selectedDriverId, setSelectedDriverId] = useState<number | null>(null);
+  const queryClient = useQueryClient();
+  const { data: regionData = [] } = useNotifications();
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
-
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [form, setForm] = useState({ type: "", title: "", body: "" });
 
   useEffect(() => {
-    document.title = 'Мэдэгдэл';
+    document.title = "Мэдэгдэл";
+  }, []);
 
-    const fetchData = async () => {
-      try {
+  useEffect(() => {
+    setPagination((p) => ({ ...p, total: regionData.length }));
+  }, [regionData.length]);
 
-        // Always fetch deliveries on page/size change
-        const deliveryRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notification`);
-        const deliveriesResult = await deliveryRes.json();
-  
-        if (deliveriesResult.success) {
-            setRegionData(deliveriesResult.data);
-          
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      }
-    };
-  
-    fetchData();
-  }, [pagination.current, pagination.pageSize]);
-  
-  
-  const rowSelection = {
-    selectedRowKeys,
-    onChange: (selectedKeys: React.Key[]) => {
-      setSelectedRowKeys(selectedKeys);
-    },
-  };
-
-  const handleDeliveryButton = () => {
-    setIsDrawerVisible(true);
-  };
-
-  // Handle modal cancel
-  const handleCancel = () => {
-    setIsModalVisible(false);
-  };
-
-  // Handle form submission (for example, you could save data here)
   const handleOk = async () => {
     try {
-      const values = await form.validateFields();
-  
-      // Construct the request payload
       const payload = {
-        title: values.title,
-        body: values.body,
-        type: values.type,
+        title: form.title,
+        body: form.body,
+        type: Number(form.type),
       };
-  
-      // Send the POST request
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notification`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
       });
-  
+
       const result = await response.json();
-  
+
       if (result.success) {
-        // Optionally refresh the delivery list
-        const refreshed = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notification`);
-        const refreshedResult = await refreshed.json();
-        if (refreshedResult.success) {
-            setRegionData(refreshedResult.data);
-        }
-  
-        // Reset form and close drawer
-        form.resetFields();
+        await queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
+        setForm({ type: "", title: "", body: "" });
         setIsDrawerVisible(false);
       } else {
-        console.error('Failed to create delivery:', result.message);
+        console.error("Failed to create delivery:", result.message);
+        toast.error(result.message || "Үүсгэхэд алдаа гарлаа");
       }
     } catch (err) {
-      console.error('Validation or request error:', err);
+      console.error("Validation or request error:", err);
     }
   };
 
-
-  const handleCloseDrawer = () => {
-    setIsDrawerVisible(false);
+  const toggleRow = (id: number) => {
+    setSelectedRowKeys((prev) => (prev.includes(id) ? prev.filter((k) => k !== id) : [...prev, id]));
   };
-
+  const paged = regionData.slice((pagination.current - 1) * pagination.pageSize, pagination.current * pagination.pageSize);
+  const pageCount = Math.max(1, Math.ceil(regionData.length / pagination.pageSize));
 
   return (
-    <div style={{ paddingBottom: '100px' }}> {/* Adding padding to prevent overlap with fixed button */}
-      <h1 style={{ marginBottom: 24 }}>Мэдэгдэл илгээх</h1>
+    <div className="pb-24">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Мэдэгдэл илгээх</h1>
+        <Button onClick={() => setIsDrawerVisible(true)}>+ Мэдэгдэл илгээх</Button>
+      </div>
 
-      <Space style={{ marginBottom: 16 }} wrap>
-       
-         <Button
-          type="primary"
-          style={{ marginLeft: 'auto' }}
-          onClick={handleDeliveryButton}
-        >
-          + Мэдэгдэл илгээх
+      <div className="border rounded-md">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={paged.length > 0 && paged.every((r) => selectedRowKeys.includes(r.id))}
+                  onCheckedChange={() => {
+                    if (paged.every((r) => selectedRowKeys.includes(r.id))) {
+                      setSelectedRowKeys((prev) => prev.filter((id) => !paged.some((r) => r.id === id)));
+                    } else {
+                      setSelectedRowKeys((prev) => [...new Set([...prev, ...paged.map((r) => r.id)])]);
+                    }
+                  }}
+                />
+              </TableHead>
+              <TableHead>Үүссэн огноо</TableHead>
+              <TableHead>Төрөл</TableHead>
+              <TableHead>Гарчиг</TableHead>
+              <TableHead>Мэдээлэл</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {paged.map((record) => (
+              <TableRow key={record.id}>
+                <TableCell>
+                  <Checkbox checked={selectedRowKeys.includes(record.id)} onCheckedChange={() => toggleRow(record.id)} />
+                </TableCell>
+                <TableCell>{record.createdAt ? dayjs(record.createdAt).format("YYYY-MM-DD hh:mm A") : "-"}</TableCell>
+                <TableCell>{record.type === 1 ? "Харилцагч" : "Жолооч"}</TableCell>
+                <TableCell>{record.title}</TableCell>
+                <TableCell>{record.body}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="mt-4 flex items-center gap-2">
+        <Button variant="outline" size="sm" disabled={pagination.current <= 1} onClick={() => setPagination((p) => ({ ...p, current: p.current - 1 }))}>
+          Өмнөх
         </Button>
-      </Space>
+        <span className="text-sm">{pagination.current} / {pageCount}</span>
+        <Button variant="outline" size="sm" disabled={pagination.current >= pageCount} onClick={() => setPagination((p) => ({ ...p, current: p.current + 1 }))}>
+          Дараах
+        </Button>
+      </div>
 
-      <Table
-  rowSelection={rowSelection}
-  columns={columns}
-  dataSource={regionData}
-  rowKey="id"
-  pagination={{
-    position: ['topRight'], // 👈 This moves pagination to top-right
-    current: pagination.current,
-    pageSize: pagination.pageSize,
-    total: pagination.total,
-    showSizeChanger: true,
-    onChange: (page, pageSize) => {
-      setPagination((prev) => ({
-        ...prev,
-        current: page,
-        pageSize: pageSize,
-      }));
-    },
-  }}
-/>
-
-
- <Drawer
-        title="Мэдэгдэл илгээх"
-        placement="right"
-        visible={isDrawerVisible}
-        onClose={handleCloseDrawer}
-        width="400px"  // Adjust the width as needed
-        height="100%"  // Full height
-        bodyStyle={{ padding: '20px' }}
-      >
-        <Form form={form} layout="vertical">
-        <Form.Item
-            label="Төрөл"
-            name="type"
-            rules={[{ required: true, message: 'Төрөл сонгоно уу!' }]}
-            >
-            <Select placeholder="Төрөл сонгох">
-                <Select.Option value={1}>Харилцагч</Select.Option>
-                <Select.Option value={2}>Жолооч</Select.Option>
-            </Select>
-            </Form.Item>
-
-        <Form.Item
-            label="Гарчиг"
-            name="title"
-            rules={[{ required: true, message: 'Please input the address!' }]}
-          >
-            <Input placeholder="Гарчиг оруулах" />
-          </Form.Item>
-          <Form.Item
-            label="Мэдэгдэл"
-            name="body"
-            rules={[{ required: true, message: 'Please input the address!' }]}
-          >
-            <Input placeholder="Мэдэгдэл оруулах" />
-          </Form.Item>
-        
-          <Form.Item>
-            <Button type="primary" onClick={handleOk} block>
-              Үүсгэх
-            </Button>
-          </Form.Item>
-        </Form>
-      </Drawer>
-      {/* Fixed Bottom Section */}
-      
+      <Sheet open={isDrawerVisible} onOpenChange={setIsDrawerVisible}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Мэдэгдэл илгээх</SheetTitle>
+          </SheetHeader>
+          <div className="space-y-3 mt-4">
+            <div className="space-y-2">
+              <Label>Төрөл</Label>
+              <Select value={form.type} onValueChange={(v) => setForm((p) => ({ ...p, type: v }))}>
+                <SelectTrigger><SelectValue placeholder="Төрөл сонгох" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Харилцагч</SelectItem>
+                  <SelectItem value="2">Жолооч</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Гарчиг</Label>
+              <Input placeholder="Гарчиг оруулах" value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Мэдэгдэл</Label>
+              <Input placeholder="Мэдэгдэл оруулах" value={form.body} onChange={(e) => setForm((p) => ({ ...p, body: e.target.value }))} />
+            </div>
+            <Button className="w-full" onClick={handleOk}>Үүсгэх</Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

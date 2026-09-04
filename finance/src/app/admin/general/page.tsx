@@ -1,18 +1,35 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
-import { Table, Spin, message, Tag, Input, Select, Space, Button } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import dayjs from 'dayjs';
+import React, { useEffect, useState } from "react";
+import dayjs from "dayjs";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface General {
   id: number;
   user_id: number;
   type: number;
   count: number;
-  sum: number;      // sum as number
-  account: number;  // account as number
-  cash: number;     // cash as number
+  sum: number;
+  account: number;
+  cash: number;
   status: number;
   createdAt: string;
   updatedAt: string;
@@ -29,40 +46,38 @@ interface User {
 export default function GeneralReportPage() {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<General[]>([]);
-  const [merchantId, setMerchantId] = useState<number | undefined>();
+  const [merchantId, setMerchantId] = useState<string>("");
   const [merchants, setMerchants] = useState<User[]>([]);
   const [user, setUser] = useState<any>(null);
   const [isMerchant, setIsMerchant] = useState<boolean>(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
 
-  // Get user data from localStorage
   useEffect(() => {
-    const userData = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+    const userData = typeof window !== "undefined" ? localStorage.getItem("user") : null;
     const userObj = userData ? JSON.parse(userData) : null;
     setUser(userObj);
     setIsMerchant(userObj?.role === 2);
-    
-    // If user is merchant, set merchantId to their ID
+
     if (userObj?.role === 2) {
-      setMerchantId(userObj.id);
+      setMerchantId(String(userObj.id));
     }
   }, []);
 
-  // Fetch merchants (only for non-merchant users)
   useEffect(() => {
     const fetchMerchants = async () => {
-      // Don't fetch merchants if user is merchant
       if (isMerchant) return;
-      
+
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/user/merchant`);
         const result = await res.json();
         if (result.success) {
           setMerchants(result.data);
         } else {
-          message.error('Failed to fetch merchants');
+          toast.error("Failed to fetch merchants");
         }
-      } catch (err) {
-        message.error('Error fetching merchants');
+      } catch {
+        toast.error("Error fetching merchants");
       }
     };
     fetchMerchants();
@@ -71,22 +86,19 @@ export default function GeneralReportPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      
+
       const params = new URLSearchParams();
-      
-      // If user is merchant, always use their ID
+
       if (isMerchant && user?.id) {
-        params.append('merchantId', user.id.toString());
+        params.append("merchantId", user.id.toString());
       } else if (merchantId) {
-        // For non-merchant users, use the selected merchantId
-        params.append('merchantId', merchantId.toString());
+        params.append("merchantId", merchantId);
       }
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/general?${params.toString()}`);
       const result = await res.json();
-      
+
       if (result.success) {
-        // Ensure account + cash = sum on load
         const formattedData = result.data.map((item: any) => ({
           ...item,
           sum: parseFloat(item.sum),
@@ -95,11 +107,11 @@ export default function GeneralReportPage() {
         }));
         setData(formattedData);
       } else {
-        message.error('Failed to fetch generals');
+        toast.error("Failed to fetch generals");
         setData([]);
       }
-    } catch (err) {
-      message.error('Error fetching generals');
+    } catch {
+      toast.error("Error fetching generals");
       setData([]);
     } finally {
       setLoading(false);
@@ -107,12 +119,11 @@ export default function GeneralReportPage() {
   };
 
   useEffect(() => {
-    if (user) { // Only fetch data when user data is available
+    if (user) {
       fetchData();
     }
   }, [merchantId, isMerchant, user]);
 
-  // Handle account change
   const handleAccountChange = async (id: number, value: number) => {
     setData((prev) =>
       prev.map((item) => {
@@ -134,111 +145,91 @@ export default function GeneralReportPage() {
 
       const result = await res.json();
       if (!result.success) {
-        message.error("Failed to update account");
+        toast.error("Failed to update account");
       }
-    } catch (err) {
-      message.error("Error updating account");
+    } catch {
+      toast.error("Error updating account");
     }
   };
 
-  const columns: ColumnsType<General> = [
-    { 
-      title: 'Хэрэглэгч', 
-      dataIndex: ['user', 'username'], 
-      key: 'user', 
-      render: (_, record) => record.user?.username ?? '-' 
-    },
-    { 
-      title: 'Төрөл', 
-      dataIndex: 'type', 
-      key: 'type',
-      render: (val: number) => (val === 1 ? 'Driver' : 'Merchant'),
-    },
-    { title: 'Count', dataIndex: 'count', key: 'count' },
-    { 
-      title: 'Дүн (₮)', 
-      dataIndex: 'sum', 
-      key: 'sum',
-      render: (val: number) => val.toLocaleString(),
-    },
-    { 
-        title: 'Данс (₮)', 
-        dataIndex: 'account', 
-        key: 'account',
-        render: (val: number, record) => (
-          isMerchant ? (
-            <span>{val.toLocaleString()}</span>
-          ) : (
-            <Input
-              type="number"
-              value={val}
-              min={0}
-              max={record.sum}
-              onChange={(e) => handleAccountChange(record.id, parseFloat(e.target.value))}
-              style={{ width: 120 }}
-            />
-          )
-        ),
-      },
-    { 
-      title: 'Бэлэн (₮)', 
-      dataIndex: 'cash', 
-      key: 'cash',
-      render: (val: number) => val.toLocaleString(),
-    },
-    { 
-      title: 'Төлөв', 
-      dataIndex: 'status', 
-      key: 'status',
-      render: (val: number) => (
-        <Tag color={val === 1 ? 'red' : 'green'}>
-          {val === 1 ? 'Тооцоо нийлээгүй' : 'Тооцоо нийлсэн'}
-        </Tag>
-      ),
-    },
-    { 
-      title: 'Үүссэн огноо', 
-      dataIndex: 'createdAt', 
-      key: 'createdAt',
-      render: (text: string) => dayjs(text).format('YYYY-MM-DD HH:mm:ss'),
-    },
-  ];
+  const paged = data.slice((page - 1) * pageSize, page * pageSize);
+  const pageCount = Math.max(1, Math.ceil(data.length / pageSize));
 
   return (
-    <div style={{ padding: 20 }}>
-      <h4 className="text-xl font-bold mb-4">Ерөнхий тайлан</h4>
+    <div className="p-5">
+      <h4 className="mb-4 text-xl font-bold">Ерөнхий тайлан</h4>
 
-      {/* Filters - Only show for non-merchant users */}
       {!isMerchant && (
-        <Space style={{ marginBottom: 16 }}>
-          <Select
-            placeholder="Select Merchant"
-            style={{ width: 200 }}
-            allowClear
-            value={merchantId}
-            onChange={(value) => setMerchantId(value)}
-          >
-            {merchants.map((merchant) => (
-              <Select.Option key={merchant.id} value={merchant.id}>
-                {merchant.username}
-              </Select.Option>
-            ))}
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <Select value={merchantId || undefined} onValueChange={setMerchantId}>
+            <SelectTrigger className="w-[200px]"><SelectValue placeholder="Select Merchant" /></SelectTrigger>
+            <SelectContent>
+              {merchants.map((merchant) => (
+                <SelectItem key={merchant.id} value={String(merchant.id)}>{merchant.username}</SelectItem>
+              ))}
+            </SelectContent>
           </Select>
-
-          <Button onClick={fetchData}>Apply Filters</Button>
-        </Space>
+          <Button variant="outline" onClick={fetchData}>Apply Filters</Button>
+        </div>
       )}
 
       {loading ? (
-        <Spin />
+        <p className="py-8 text-center text-muted-foreground">Ачааллаж байна...</p>
       ) : (
-        <Table
-          rowKey="id"
-          dataSource={data}
-          columns={columns}
-          pagination={{ pageSize: 20 }}
-        />
+        <div className="border rounded-md">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Хэрэглэгч</TableHead>
+                <TableHead>Төрөл</TableHead>
+                <TableHead>Count</TableHead>
+                <TableHead>Дүн (₮)</TableHead>
+                <TableHead>Данс (₮)</TableHead>
+                <TableHead>Бэлэн (₮)</TableHead>
+                <TableHead>Төлөв</TableHead>
+                <TableHead>Үүссэн огноо</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paged.map((record) => (
+                <TableRow key={record.id}>
+                  <TableCell>{record.user?.username ?? "-"}</TableCell>
+                  <TableCell>{record.type === 1 ? "Driver" : "Merchant"}</TableCell>
+                  <TableCell>{record.count}</TableCell>
+                  <TableCell>{record.sum.toLocaleString()}</TableCell>
+                  <TableCell>
+                    {isMerchant ? (
+                      <span>{record.account.toLocaleString()}</span>
+                    ) : (
+                      <Input
+                        type="number"
+                        className="w-[120px]"
+                        value={record.account}
+                        min={0}
+                        max={record.sum}
+                        onChange={(e) => handleAccountChange(record.id, parseFloat(e.target.value))}
+                      />
+                    )}
+                  </TableCell>
+                  <TableCell>{record.cash.toLocaleString()}</TableCell>
+                  <TableCell>
+                    <Badge variant={record.status === 1 ? "destructive" : "success"}>
+                      {record.status === 1 ? "Тооцоо нийлээгүй" : "Тооцоо нийлсэн"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{dayjs(record.createdAt).format("YYYY-MM-DD HH:mm:ss")}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
+
+      <div className="mt-4 flex items-center gap-2">
+        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Өмнөх</Button>
+        <span className="text-sm">{page} / {pageCount}</span>
+        <Button variant="outline" size="sm" disabled={page >= pageCount} onClick={() => setPage((p) => p + 1)}>Дараах</Button>
+      </div>
     </div>
   );
 }

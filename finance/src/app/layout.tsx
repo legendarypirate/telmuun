@@ -1,24 +1,35 @@
-
 import type { Metadata } from "next";
-import { Rubik } from "next/font/google";
+import { Inter } from "next/font/google";
+import { Toaster } from "sonner";
+import { APP_NAME } from "@/lib/page-titles";
+import { QueryProvider } from "@/components/providers/query-provider";
 import "./globals.css";
-import { AntdProvider } from "@/components/AntdProvider";
 
-const rubik = Rubik({
+const inter = Inter({
+  variable: "--font-geist-sans",
   subsets: ["latin"],
-  variable: "--font-rubik",
 });
 
 export const metadata: Metadata = {
-  title: "My App",
-  description: "Next.js + Ant Design styled",
+  title: {
+    default: APP_NAME,
+    template: `%s | ${APP_NAME}`,
+  },
+  description: "Telmuun delivery management system",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en" className={rubik.variable}>
-      <body>
-        <AntdProvider>{children}</AntdProvider>
+    <html lang="en">
+      <body className={`${inter.variable} antialiased`}>
+        <QueryProvider>
+          {children}
+          <Toaster />
+        </QueryProvider>
       </body>
     </html>
   );

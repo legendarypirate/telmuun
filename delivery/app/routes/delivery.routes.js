@@ -23,6 +23,7 @@ module.exports = app => {
   
     // Retrieve all Tutorials
     router.get("/", delivery.findAll);
+    router.get("/product-report", delivery.findAllForProductReport);
   
 router.patch("/update_price/:id", delivery.updatePrice);
 router.patch("/update_comment/:id", delivery.updateComment);

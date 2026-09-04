@@ -98,39 +98,39 @@ exports.create = (req, res) => {
         return res.status(404).json({ success: false, message: 'Request not found.' });
       }
   
-      // Update status to approved
+      const stockToUse =
+        req.body?.stock != null && !Number.isNaN(Number(req.body.stock))
+          ? Number(req.body.stock)
+          : request.stock;
+
       await request.update({ status: 2 });
   
-      // Process based on type
       if (request.type === 1) {
-        // Type 1: Create new good
         await Good.create({
           name: request.name,
-          stock: request.stock,
+          stock: stockToUse,
           merchant_id: request.merchant_id,
           ware_id: request.ware_id,
+          in_delivery: 0,
+          delivered: 0,
         });
-  
       } else if (request.type === 2) {
-        // Type 2: Add stock to existing good
         const good = await Good.findByPk(request.good_id);
         if (!good) {
           return res.status(404).json({ success: false, message: 'Good not found.' });
         }
-        await good.update({ stock: good.stock + request.stock });
-  
+        await good.update({ stock: good.stock + stockToUse });
       } else if (request.type === 3) {
-        // Type 3: Reduce stock from existing good
         const good = await Good.findByPk(request.good_id);
         if (!good) {
           return res.status(404).json({ success: false, message: 'Good not found.' });
         }
   
-        if (good.stock < request.stock) {
+        if (good.stock < stockToUse) {
           return res.status(400).json({ success: false, message: 'Not enough stock to reduce.' });
         }
   
-        await good.update({ stock: good.stock - request.stock });
+        await good.update({ stock: good.stock - stockToUse });
       }
   
       return res.json({ success: true, message: 'Request approved and processed successfully.' });

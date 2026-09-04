@@ -675,23 +675,30 @@ exports.findAll = async (req, res) => {
     // Filter by creation time so merchants see deliveries created "today"
     where.createdAt = { [Op.between]: [filterStart, filterEnd] };
 
-    // Query
-    const { count, rows } = await Delivery.findAndCountAll({
-      where,
-      limit,
-      offset,
-      include: [
-        { model: User, as: 'merchant', attributes: ['username'] },
-        { model: Status, as: 'status_name', attributes: ['status', 'color'] },
-        { model: User, as: 'driver', attributes: ['username'] },
-      ],
-      order: [['id', 'DESC']],
-    });
+    // Cap page size so a huge limit cannot lock the DB. Keep 1000 (admin UI max).
+    const safeLimit = Math.min(Math.max(limit, 1), 1000);
+
+    // Count without JOINs — findAndCountAll + includes is what made pageSize=1000 slow.
+    // Items stay lazy-loaded on expand so the list payload stays small.
+    const [count, rows] = await Promise.all([
+      Delivery.count({ where }),
+      Delivery.findAll({
+        where,
+        limit: safeLimit,
+        offset,
+        include: [
+          { model: User, as: 'merchant', attributes: ['id', 'username'] },
+          { model: Status, as: 'status_name', attributes: ['status', 'color'] },
+          { model: User, as: 'driver', attributes: ['username'] },
+        ],
+        order: [['id', 'DESC']],
+      }),
+    ]);
 
     res.status(200).json({
       success: true,
       data: rows.map(d => d.toJSON()),
-      pagination: { total: count, page, limit },
+      pagination: { total: count, page, limit: safeLimit },
     });
 
   } catch (error) {
@@ -730,29 +737,33 @@ exports.findAll = async (req, res) => {
         where.driver_id = driverId;
       }
   
-      const { count, rows } = await Delivery.findAndCountAll({
-        where,
-        limit,
-        offset,
-        include: [
-          {
-            model: User,
-            as: 'merchant',
-            attributes: ['username'],
-          },
-          {
-            model: Status,
-            as: 'status_name',
-            attributes: ['status', 'color'],
-          },
-          {
-            model: User,
-            as: 'driver',
-            attributes: ['username'],
-          },
-        ],
-        order: [['id', 'DESC']],
-      });
+      const safeLimit = Math.min(Math.max(limit, 1), 1000);
+      const [count, rows] = await Promise.all([
+        Delivery.count({ where }),
+        Delivery.findAll({
+          where,
+          limit: safeLimit,
+          offset,
+          include: [
+            {
+              model: User,
+              as: 'merchant',
+              attributes: ['username'],
+            },
+            {
+              model: Status,
+              as: 'status_name',
+              attributes: ['status', 'color'],
+            },
+            {
+              model: User,
+              as: 'driver',
+              attributes: ['username'],
+            },
+          ],
+          order: [['id', 'DESC']],
+        }),
+      ]);
   
       const formattedDeliveries = rows.map((delivery) => delivery.toJSON());
   
@@ -762,7 +773,7 @@ exports.findAll = async (req, res) => {
         pagination: {
           total: count,
           page,
-          limit,
+          limit: safeLimit,
         },
       });
     } catch (error) {
@@ -1029,6 +1040,44 @@ exports.deleteAll = (req, res) => {
 };
 
 // find all published Categories
+exports.findAllForProductReport = async (req, res) => {
+  try {
+    const { merchant_id, status_ids, start_date, end_date } = req.query;
+    const where = {
+      [Op.or]: [{ is_deleted: false }, { is_deleted: null }],
+    };
+    if (merchant_id) where.merchant_id = merchant_id;
+    if (status_ids) {
+      const statusArray = status_ids.split(",").map(Number);
+      if (statusArray.length > 0) where.status = { [Op.in]: statusArray };
+    }
+    if (start_date && end_date) {
+      where.createdAt = {
+        [Op.between]: [new Date(start_date + "T00:00:00"), new Date(end_date + "T23:59:59")],
+      };
+    }
+
+    const deliveries = await Delivery.findAll({
+      where,
+      include: [
+        { model: User, as: "merchant", attributes: ["id", "username"] },
+        {
+          model: DeliveryItem,
+          as: "items",
+          required: false,
+          include: [{ model: Good, as: "good", attributes: ["id", "name"], required: false }],
+        },
+      ],
+      order: [["id", "DESC"]],
+    });
+
+    res.status(200).json({ success: true, data: deliveries.map((d) => d.toJSON()) });
+  } catch (error) {
+    console.error("findAllForProductReport error:", error);
+    res.status(500).json({ success: false, message: "Server error", error: error.message });
+  }
+};
+
 exports.findAllPublished = (req, res) => {
   category.findAll({ where: { published: true } })
     .then(data => {

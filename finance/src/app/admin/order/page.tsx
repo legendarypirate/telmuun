@@ -1,23 +1,50 @@
-'use client';
+"use client";
 
-import React, { useState, useMemo,useEffect } from 'react';
-import { Table, Button, Space, Input, DatePicker, Drawer, Form ,Select,Tag,Modal} from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
-import dayjs, { Dayjs } from 'dayjs';
-import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
-import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
+import React, { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useDrivers, useMerchants } from "@/hooks/use-lookups";
+import { queryKeys } from "@/lib/api";
+import dayjs from "dayjs";
+import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
+import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
+import { Edit, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
-const { Option } = Select;
-
-const { RangePicker } = DatePicker;
 dayjs.extend(isSameOrAfter);
 dayjs.extend(isSameOrBefore);
+
 interface Order {
   id: number;
   phone: string;
   address: string;
-  status: number | string; // This is still the numeric or string status
+  status: number | string;
   comment: string;
   driver: {
     username: string;
@@ -26,510 +53,367 @@ interface Order {
   merchant: {
     username: string;
   };
-  status_name: {        // This field contains status and color information
+  status_name: {
     status: string;
     color: string;
   };
 }
+
 interface Status {
   id: number;
   label: string;
   color: string;
 }
 
-
-
 export default function DeliveryPage() {
-  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
-  const [merchantFilter, setMerchantFilter] = useState('');
-  const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([null, null]);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([]);
+  const [merchantFilter, setMerchantFilter] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [form] = Form.useForm();
   const [isDrawerVisible, setIsDrawerVisible] = useState(false);
-  const [merchants, setMerchants] = useState<{ id: number; username: string }[]>([]);
-  const [orderData, setOrderData] = useState<Order[]>([]);
-  const [drivers, setDrivers] = useState<{ id: number; username: string }[]>([]);
-  const [selectedDriverId, setSelectedDriverId] = useState<number | null>(null);
+  const { data: merchants = [] } = useMerchants();
+  const { data: drivers = [] } = useDrivers();
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedDriverId, setSelectedDriverId] = useState<string>("");
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
   const [permissions, setPermissions] = useState<string[]>([]);
+  const [createForm, setCreateForm] = useState({
+    merchantId: "",
+    phone: "",
+    address: "",
+    comment: "",
+  });
 
-  const userData = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+  const userData = typeof window !== "undefined" ? localStorage.getItem("user") : null;
   const user = userData ? JSON.parse(userData) : null;
   const isMerchant = user?.role === 2;
-  const username = typeof window !== 'undefined' ? localStorage.getItem('username') : null;;
+  const username = typeof window !== "undefined" ? localStorage.getItem("username") : null;
   const merchantId = isMerchant ? user.id : null;
-  const [statusList, setStatusList] = useState<Status[]>([
-    { id: 1, label: 'Шинэ', color: 'orange' },
-    { id: 2, label: 'Жолоочид', color: 'blue' },
-    { id: 3, label: 'Хүргэсэн', color: 'green' },
-    { id: 4, label: 'Цуцалсан', color: 'red' },
+  const [statusList] = useState<Status[]>([
+    { id: 1, label: "Шинэ", color: "orange" },
+    { id: 2, label: "Жолоочид", color: "blue" },
+    { id: 3, label: "Хүргэсэн", color: "green" },
+    { id: 4, label: "Цуцалсан", color: "red" },
   ]);
-    const [selectedStatuses, setSelectedStatuses] = useState<number[]>([]);
-  const [phoneFilter, setPhoneFilter] = useState('');
+  const [selectedStatuses, setSelectedStatuses] = useState<number[]>([]);
+  const [phoneFilter, setPhoneFilter] = useState("");
 
   const toggleStatus = (id: number) => {
-    setSelectedStatuses((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
-    );
+    setSelectedStatuses((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
   };
+
   useEffect(() => {
-    document.title = 'Татан авалт';
-  
-    if (isMerchant) {
-      form.setFieldsValue({ merchantId: merchantId });
+    document.title = "Татан авалт";
+    if (isMerchant && merchantId) {
+      setCreateForm((p) => ({ ...p, merchantId: String(merchantId) }));
     }
-  
-    const saved = localStorage.getItem('permissions');
+    const saved = localStorage.getItem("permissions");
     if (saved) setPermissions(JSON.parse(saved));
-  
-    const fetchData = async () => {
-      try {
-        const userData = localStorage.getItem('user');
-        const user = userData ? JSON.parse(userData) : null;
-  
-        // Fetch merchants only once
-        if (merchants.length === 0) {
-          const merchantRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/user/merchant`);
-          const merchantsResult = await merchantRes.json();
-          if (merchantsResult.success) {
-            setMerchants(merchantsResult.data);
-          }
-        }
-  
-        const { current, pageSize } = pagination;
-        let url = `${process.env.NEXT_PUBLIC_API_URL}/api/order?page=${current}&limit=${pageSize}`;
-  
-        if (user && user.role === 2) {
-          url += `&merchant_id=${user.id}`;
-        }
-  
-        if (phoneFilter) {
-          url += `&phone=${phoneFilter}`;
-        }
-  
-        if (selectedStatuses.length > 0) {
-          url += `&status_ids=${selectedStatuses.join(',')}`;
-        }
-  
-        if (dateRange[0] && dateRange[1]) {
-          url += `&start_date=${dateRange[0].format('YYYY-MM-DD')}`;
-          url += `&end_date=${dateRange[1].format('YYYY-MM-DD')}`;
-        }
-  
-        const orderRes = await fetch(url);
-        const ordersResult = await orderRes.json();
-  
-        if (ordersResult.success) {
-          setOrderData(ordersResult.data);
-          setPagination((prev) => ({
-            ...prev,
-            total: ordersResult.pagination.total,
-          }));
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      }
-    };
-  
-    fetchData();
-  }, [
-    pagination.current,
-    pagination.pageSize,
-    form,
-    isMerchant,
-    merchantId,
+  }, [isMerchant, merchantId]);
+
+  const orderFilters = {
+    page: pagination.current,
+    pageSize: pagination.pageSize,
     phoneFilter,
     selectedStatuses,
-    dateRange,
-  ]);
-  
-  const hasPermission = (perm: string) => permissions.includes(perm);
-  const columns: ColumnsType<Order> = [
-    {
-      title: 'Үүссэн огноо',
-      dataIndex: 'createdAt',
-      render: (text: string) => {
-        return dayjs(text).format('YYYY-MM-DD hh:mm A'); // Format the date here
-      },
-    },
-    { 
-      title: 'Мерчанд нэр', 
-      dataIndex: ['merchant', 'username'], 
-      render: (_, record) => record.merchant?.username || '-' 
-    },
-    { title: 'Утас', dataIndex: 'phone' },
-    { title: 'Хаяг', dataIndex: 'address' },
-    
-    // Updated Status Column with Tag
-    {
-      title: 'Төлөв',
-      dataIndex: 'status',
-      render: (status: number) => {
-        const found = statusList.find(s => s.id === status);
-        return (
-          <Tag color={found?.color || 'gray'}>
-            {found?.label || 'Unknown'}
-          </Tag>
-        );
-      },
-    },  
-    { title: 'Тайлбар', dataIndex: 'comment' },
-    { 
-      title: 'Жолооч нэр', 
-      dataIndex: ['driver', 'username'], 
-      render: (_, record) => record.driver?.username || '-' 
-    },  {
-      title: 'Үйлдэл',
-      key: 'actions',
-      render: (_: any, record: Order) => (
-        <Space>
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => alert(`Edit ${record.merchant?.username}`)}
-          >
-            Edit
-          </Button>
-          <Button
-            type="link"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => alert(`Delete ${record.merchant?.username}`)}
-          >
-            Delete
-          </Button>
-        </Space>
-      ),
-    },
-  ];
-  
-  const rowSelection = {
-    selectedRowKeys,
-    onChange: (selectedKeys: React.Key[]) => {
-      setSelectedRowKeys(selectedKeys);
-    },
+    startDate,
+    endDate,
+    refreshKey,
+    merchantId: isMerchant ? merchantId : undefined,
   };
 
+  const { data: orderResult } = useQuery({
+    queryKey: queryKeys.orders(orderFilters),
+    queryFn: async () => {
+      const storedUserData = localStorage.getItem("user");
+      const storedUser = storedUserData ? JSON.parse(storedUserData) : null;
+      let url = `${process.env.NEXT_PUBLIC_API_URL}/api/order?page=${pagination.current}&limit=${pagination.pageSize}`;
+      if (storedUser && storedUser.role === 2) url += `&merchant_id=${storedUser.id}`;
+      if (phoneFilter) url += `&phone=${phoneFilter}`;
+      if (selectedStatuses.length > 0) url += `&status_ids=${selectedStatuses.join(",")}`;
+      if (startDate && endDate) url += `&start_date=${startDate}&end_date=${endDate}`;
+      const orderRes = await fetch(url);
+      const ordersResult = await orderRes.json();
+      if (!ordersResult.success) throw new Error(ordersResult.message || "Failed to fetch orders");
+      return {
+        data: (ordersResult.data || []) as Order[],
+        total: ordersResult.pagination?.total || 0,
+      };
+    },
+    staleTime: 20_000,
+    placeholderData: (prev) => prev,
+  });
 
-  // Handle form submission (for example, you could save data here)
+  const orderData = orderResult?.data || [];
+
+  useEffect(() => {
+    if (orderResult?.total != null) {
+      setPagination((prev) => (prev.total === orderResult.total ? prev : { ...prev, total: orderResult.total }));
+    }
+  }, [orderResult?.total]);
+
+  const hasPermission = (perm: string) => permissions.includes(perm);
+
   const handleOk = async () => {
     try {
-      const values = await form.validateFields();
-  
-      // Construct the request payload
       const payload = {
-        merchant_id: values.merchantId,
-        phone: values.phone,
-        address: values.address,
-        status: 1, // Default status as per your backend
-        comment: values.comment,
+        merchant_id: isMerchant ? merchantId : Number(createForm.merchantId),
+        phone: createForm.phone,
+        address: createForm.address,
+        status: 1,
+        comment: createForm.comment,
       };
-  
-      // Send the POST request
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/order`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
       });
-  
+
       const result = await response.json();
-  
+
       if (result.success) {
-        // Optionally refresh the delivery list
-        const refreshed = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/order`);
-        const refreshedResult = await refreshed.json();
-        if (refreshedResult.success) {
-            setOrderData(refreshedResult.data);
-        }
-  
-        // Reset form and close drawer
-        form.resetFields();
+        setRefreshKey((k) => k + 1);
+        setCreateForm({ merchantId: isMerchant && merchantId ? String(merchantId) : "", phone: "", address: "", comment: "" });
         setIsDrawerVisible(false);
       } else {
-        console.error('Failed to create delivery:', result.message);
+        console.error("Failed to create delivery:", result.message);
       }
     } catch (err) {
-      console.error('Validation or request error:', err);
+      console.error("Validation or request error:", err);
     }
   };
 
-
-  const handleCloseDrawer = () => {
-    setIsDrawerVisible(false);
-  };
   const filteredData = useMemo(() => {
     return orderData.filter((item) => {
-      const matchesMerchant = item.merchant?.username
-        ?.toLowerCase()
-        .includes(merchantFilter.toLowerCase());
-  
+      const matchesMerchant = item.merchant?.username?.toLowerCase().includes(merchantFilter.toLowerCase());
       const itemDate = dayjs(item.createdAt);
-  
       const matchesDate =
-        !dateRange[0] ||
-        !dateRange[1] ||
-        (
-          itemDate.isSameOrAfter(dateRange[0]?.startOf('day')) &&
-          itemDate.isSameOrBefore(dateRange[1]?.endOf('day'))
-        );
-  
+        !startDate ||
+        !endDate ||
+        (itemDate.isSameOrAfter(dayjs(startDate).startOf("day")) && itemDate.isSameOrBefore(dayjs(endDate).endOf("day")));
       return matchesMerchant && matchesDate;
     });
-  }, [orderData, merchantFilter, dateRange]);
-  
+  }, [orderData, merchantFilter, startDate, endDate]);
 
   const handleAllocateToDriver = async () => {
     if (selectedRowKeys.length === 0) {
-      alert('Please select at least one delivery.');
+      alert("Please select at least one delivery.");
       return;
     }
 
-    // Fetch drivers only when this function is called
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/user/drivers`);
-      const result = await response.json();
-      
-      if (result.success) {
-        setDrivers(result.data); // Set the list of drivers
-        setIsModalVisible(true); // Open the modal
-      } else {
-        alert('Failed to load drivers.');
-      }
-    } catch (error) {
-      console.error('Error fetching drivers:', error);
-      alert('Error fetching drivers.');
-    }
-  };
-
-  const handleDriverSelection = (value: number) => {
-    setSelectedDriverId(value); // Set the selected driver ID
+    setIsModalVisible(true);
   };
 
   const handleSaveAllocation = async () => {
     if (!selectedDriverId) {
-      alert('Please select a driver!');
+      alert("Please select a driver!");
       return;
     }
-  
-    // Send the selected driver ID and the selected delivery IDs to the backend
+
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/order/allocate`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          driver_id: selectedDriverId,
-          delivery_ids: selectedRowKeys, // Pass the selected delivery IDs
+          driver_id: Number(selectedDriverId),
+          delivery_ids: selectedRowKeys,
         }),
       });
-  
+
       const result = await response.json();
-  
+
       if (result.success) {
-        // Close the modal and reset the state
         setIsModalVisible(false);
-        setSelectedDriverId(null);
-        alert('Deliveries allocated to the driver successfully.');
-  
-        // Fetch updated delivery data here to refresh the table
-        const updatedDeliveriesResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/order`);
-        const updatedDeliveries = await updatedDeliveriesResponse.json();
-  
-        if (updatedDeliveries.success) {
-          // Update the state with the new deliveries data
-          setOrderData(updatedDeliveries.data);
-        } else {
-          alert('Failed to fetch updated deliveries data.');
-        }
+        setSelectedDriverId("");
+        alert("Deliveries allocated to the driver successfully.");
+
+        setRefreshKey((k) => k + 1);
       } else {
-        alert('Failed to allocate deliveries.');
+        alert("Failed to allocate deliveries.");
       }
     } catch (error) {
-      console.error('Error allocating deliveries:', error);
+      console.error("Error allocating deliveries:", error);
     }
   };
-  
+
+  const toggleRow = (id: number) => {
+    setSelectedRowKeys((prev) => (prev.includes(id) ? prev.filter((k) => k !== id) : [...prev, id]));
+  };
+  const pageCount = Math.max(1, Math.ceil(pagination.total / pagination.pageSize));
+
   return (
-    <div style={{ paddingBottom: '100px' }}> {/* Adding padding to prevent overlap with fixed button */}
-      <h1 style={{ marginBottom: 24 }}>Татан авалт</h1>
+    <div className="pb-28">
+      <h1 className="mb-6 text-3xl font-bold">Татан авалт</h1>
 
-      <Space style={{ marginBottom: 16 }} wrap>
-  <Input
-    placeholder="Filter by Phone"
-    value={phoneFilter}
-    onChange={(e) => setPhoneFilter(e.target.value)}
-    allowClear
-  />
-  <RangePicker
-    value={dateRange}
-    onChange={(range) => {
-      setDateRange(range ?? [null, null]);
-    }}
-  />
- {statusList.map((status) => (
-  <Tag
-    key={status.id}
-    color={status.color}
-    onClick={() => toggleStatus(status.id)}
-    style={{
-      cursor: 'pointer',
-      userSelect: 'none',
-      border: selectedStatuses.includes(status.id)
-        ? '2px solid #52c41a'
-        : '2px solid transparent',
-      borderRadius: 4,
-    }}
-  >
-    {status.label}
-  </Tag>
-))}
-
-  {hasPermission('order:create_order') && (
-    <Button
-      type="primary"
-      style={{ marginLeft: 'auto' }}
-      onClick={() => setIsDrawerVisible(true)}
-    >
-      + Захиалга үүсгэх
-    </Button>
-  )}
-</Space>
-
-      <Table
-  rowSelection={rowSelection}
-  columns={columns}
-  dataSource={orderData}
-  rowKey="id"
-  pagination={{
-    position: ['bottomRight'], // 👈 This moves pagination to top-right
-    current: pagination.current,
-    pageSize: pagination.pageSize,
-    total: pagination.total,
-    showSizeChanger: true,
-    onChange: (page, pageSize) => {
-      setPagination((prev) => ({
-        ...prev,
-        current: page,
-        pageSize: pageSize,
-      }));
-    },
-  }}
-/>
-
- <Drawer
-        title="Захиалга үүсгэх"
-        placement="right"
-        visible={isDrawerVisible}
-        onClose={handleCloseDrawer}
-        width="400px"  // Adjust the width as needed
-        height="100%"  // Full height
-        bodyStyle={{ padding: '20px' }}
-      >
-        <Form form={form} layout="vertical">
-        <Form.Item
-  label="Дэлгүүрийн нэр"
-  name="merchantId"
-  rules={[{ required: true, message: 'Please select a merchant!' }]}
->
-  {isMerchant ? (
-    <>
-      <div style={{
-        padding: '4px 11px',
-        border: '1px solid #d9d9d9',
-        borderRadius: 2,
-        backgroundColor: '#f5f5f5',
-        color: 'rgba(0, 0, 0, 0.85)',
-        minHeight: 32,
-      }}>
-        {username}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <Input placeholder="Filter by Phone" value={phoneFilter} onChange={(e) => setPhoneFilter(e.target.value)} className="w-48" />
+        <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-40" />
+        <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-40" />
+        {statusList.map((status) => (
+          <button
+            key={status.id}
+            onClick={() => toggleStatus(status.id)}
+            className={`rounded-md border px-3 py-1 text-sm ${selectedStatuses.includes(status.id) ? "border-green-600 ring-2 ring-green-200" : "border-transparent"}`}
+            style={{ background: status.color, color: "#fff" }}
+          >
+            {status.label}
+          </button>
+        ))}
+        {hasPermission("order:create_order") && (
+          <Button className="ml-auto" onClick={() => setIsDrawerVisible(true)}>
+            + Захиалга үүсгэх
+          </Button>
+        )}
       </div>
-      {/* Hidden input to submit merchantId */}
-      <Input type="hidden" value={merchantId} />
-    </>
-  ) : (
-    <Select placeholder="Select a merchant">
-      {merchants.map((merchant) => (
-        <Select.Option key={merchant.id} value={merchant.id}>
-          {merchant.username}
-        </Select.Option>
-      ))}
-    </Select>
-  )}
-</Form.Item>
-          <Form.Item
-            label="Утас"
-            name="phone"
-            rules={[{ required: true, message: 'Please input the phone number!' }]}
-          >
-            <Input placeholder="Enter phone number" />
-          </Form.Item>
 
-          <Form.Item
-            label="Хаяг"
-            name="address"
-            rules={[{ required: true, message: 'Please input the address!' }]}
-          >
-            <Input placeholder="Enter address" />
-          </Form.Item>
-          
-          <Form.Item
-            label="Тайлбар"
-            name="comment"
-            rules={[{ required: true, message: 'Please input the comment!' }]}
-          >
-            <Input placeholder="Enter comment" />
-          </Form.Item>
+      <div className="border rounded-md">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={orderData.length > 0 && selectedRowKeys.length === orderData.length}
+                  onCheckedChange={() => {
+                    if (selectedRowKeys.length === orderData.length) setSelectedRowKeys([]);
+                    else setSelectedRowKeys(orderData.map((o) => o.id));
+                  }}
+                />
+              </TableHead>
+              <TableHead>Үүссэн огноо</TableHead>
+              <TableHead>Мерчанд нэр</TableHead>
+              <TableHead>Утас</TableHead>
+              <TableHead>Хаяг</TableHead>
+              <TableHead>Төлөв</TableHead>
+              <TableHead>Тайлбар</TableHead>
+              <TableHead>Жолооч нэр</TableHead>
+              <TableHead>Үйлдэл</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {orderData.map((record) => {
+              const found = statusList.find((s) => s.id === record.status);
+              return (
+                <TableRow key={record.id}>
+                  <TableCell>
+                    <Checkbox checked={selectedRowKeys.includes(record.id)} onCheckedChange={() => toggleRow(record.id)} />
+                  </TableCell>
+                  <TableCell>{dayjs(record.createdAt).format("YYYY-MM-DD hh:mm A")}</TableCell>
+                  <TableCell>{record.merchant?.username || "-"}</TableCell>
+                  <TableCell>{record.phone}</TableCell>
+                  <TableCell>{record.address}</TableCell>
+                  <TableCell>
+                    <Badge style={{ backgroundColor: found?.color || "gray", color: "#fff" }}>
+                      {found?.label || "Unknown"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{record.comment}</TableCell>
+                  <TableCell>{record.driver?.username || "-"}</TableCell>
+                  <TableCell className="flex gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => alert(`Edit ${record.merchant?.username}`)}>
+                      <Edit className="h-4 w-4" /> Edit
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => alert(`Delete ${record.merchant?.username}`)}>
+                      <Trash2 className="h-4 w-4 text-red-500" /> Delete
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
 
-          <Form.Item>
-            <Button type="primary" onClick={handleOk} block>
-              Үүсгэх
-            </Button>
-          </Form.Item>
-        </Form>
-      </Drawer>
-      {/* Fixed Bottom Section */}
-      {hasPermission('order:allocate_order') && (
+      <div className="mt-4 flex items-center gap-2">
+        <Select value={String(pagination.pageSize)} onValueChange={(v) => setPagination((p) => ({ ...p, pageSize: Number(v), current: 1 }))}>
+          <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {["10", "20", "50"].map((n) => (
+              <SelectItem key={n} value={n}>{n}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button variant="outline" size="sm" disabled={pagination.current <= 1} onClick={() => setPagination((p) => ({ ...p, current: p.current - 1 }))}>
+          Өмнөх
+        </Button>
+        <span className="text-sm">{pagination.current} / {pageCount}</span>
+        <Button variant="outline" size="sm" disabled={pagination.current >= pageCount} onClick={() => setPagination((p) => ({ ...p, current: p.current + 1 }))}>
+          Дараах
+        </Button>
+        <span className="text-sm text-muted-foreground">Нийт {pagination.total}</span>
+      </div>
 
-      <div style={{ position: 'fixed', bottom: 0, left: 0, width: '100%', background: '#fff', padding: '16px 24px', borderTop: '1px solid #ddd', zIndex: 999 }}>
-        <Space style={{ marginRight: 16 }}>
-          <div>
-            {selectedRowKeys.length} item(s) selected
+      <Sheet open={isDrawerVisible} onOpenChange={setIsDrawerVisible}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Захиалга үүсгэх</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4 space-y-3">
+            <div className="space-y-2">
+              <Label>Дэлгүүрийн нэр</Label>
+              {isMerchant ? (
+                <p className="rounded-md border bg-muted px-3 py-2 text-sm">{username}</p>
+              ) : (
+                <Select value={createForm.merchantId} onValueChange={(v) => setCreateForm((p) => ({ ...p, merchantId: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select a merchant" /></SelectTrigger>
+                  <SelectContent>
+                    {merchants.map((merchant) => (
+                      <SelectItem key={merchant.id} value={String(merchant.id)}>{merchant.username}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Утас</Label>
+              <Input placeholder="Enter phone number" value={createForm.phone} onChange={(e) => setCreateForm((p) => ({ ...p, phone: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Хаяг</Label>
+              <Input placeholder="Enter address" value={createForm.address} onChange={(e) => setCreateForm((p) => ({ ...p, address: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Тайлбар</Label>
+              <Input placeholder="Enter comment" value={createForm.comment} onChange={(e) => setCreateForm((p) => ({ ...p, comment: e.target.value }))} />
+            </div>
+            <Button className="w-full" onClick={handleOk}>Үүсгэх</Button>
           </div>
-          <Button
-            type="primary"
-            onClick={handleAllocateToDriver}
-            disabled={selectedRowKeys.length === 0}
-          >
+        </SheetContent>
+      </Sheet>
+
+      {hasPermission("order:allocate_order") && (
+        <div className="fixed bottom-0 left-64 right-0 z-[999] flex items-center gap-4 border-t bg-background p-4">
+          <div>{selectedRowKeys.length} item(s) selected</div>
+          <Button onClick={handleAllocateToDriver} disabled={selectedRowKeys.length === 0}>
             Allocate to Driver
           </Button>
-        </Space>
-        
-      </div>
+        </div>
       )}
-      <Modal
-        title="Select Driver"
-        visible={isModalVisible}
-        onCancel={() => setIsModalVisible(false)}
-        onOk={handleSaveAllocation}
-        okText="Save"
-        cancelText="Cancel"
-      >
-        <Select
-          style={{ width: '100%' }}
-          placeholder="Select a driver"
-          onChange={handleDriverSelection}
-          value={selectedDriverId}
-        >
-          {drivers.map((driver) => (
-            <Option key={driver.id} value={driver.id}>
-              {driver.username}
-            </Option>
-          ))}
-        </Select>
-      </Modal>
+
+      <Dialog open={isModalVisible} onOpenChange={setIsModalVisible}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select Driver</DialogTitle>
+          </DialogHeader>
+          <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+            <SelectTrigger><SelectValue placeholder="Select a driver" /></SelectTrigger>
+            <SelectContent>
+              {drivers.map((driver) => (
+                <SelectItem key={driver.id} value={String(driver.id)}>{driver.username}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsModalVisible(false)}>Cancel</Button>
+            <Button onClick={handleSaveAllocation}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -42,6 +42,7 @@ db.summaries = require("./summary.model.js")(sequelize, Sequelize);
 db.permissions = require("./permission.model.js")(sequelize, Sequelize);
 db.wares = require("./ware.model.js")(sequelize, Sequelize);
 db.goods = require("./good.model.js")(sequelize, Sequelize);
+db.good_histories = require("./good_history.model.js")(sequelize, Sequelize);
 db.requests = require("./request.model.js")(sequelize, Sequelize);
 db.delivery_items = require("./delivery_item.model.js")(sequelize, Sequelize);
 
@@ -100,6 +101,31 @@ db.wares.hasMany(db.goods, {
 db.goods.belongsTo(db.wares, {
   foreignKey: 'ware_id',
   as: 'ware', // good.ware
+});
+
+db.goods.hasMany(db.good_histories, {
+  foreignKey: 'good_id',
+  as: 'histories',
+});
+db.good_histories.belongsTo(db.goods, {
+  foreignKey: 'good_id',
+  as: 'good',
+});
+db.good_histories.belongsTo(db.deliveries, {
+  foreignKey: 'delivery_id',
+  as: 'delivery',
+});
+db.deliveries.hasMany(db.good_histories, {
+  foreignKey: 'delivery_id',
+  as: 'good_histories',
+});
+db.good_histories.belongsTo(db.users, {
+  foreignKey: 'user_id',
+  as: 'user',
+});
+db.users.hasMany(db.good_histories, {
+  foreignKey: 'user_id',
+  as: 'good_histories',
 });
 
 db.delivery_items.belongsTo(db.goods, {

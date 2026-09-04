@@ -1,20 +1,29 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { Table, Button, Space, Select, Tag, Switch, DatePicker,Drawer } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import {EyeOutlined } from '@ant-design/icons';
-import dayjs, { Dayjs } from 'dayjs';
-import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
-import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
+import React, { useEffect, useState } from "react";
+import dayjs from "dayjs";
+import { Eye } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
-dayjs.extend(isSameOrAfter);
-dayjs.extend(isSameOrBefore);
-
-const { Option } = Select;
-const { RangePicker } = DatePicker;
-
-// ---- Delivery interface ----
 interface SummaryType {
   id: number;
   total: number;
@@ -24,8 +33,8 @@ interface SummaryType {
   driver_summaries: { username: string };
   createdAt: string;
   merchant: { username: string };
-  
 }
+
 export interface DeliveryType {
   id: number;
   merchant_id: number;
@@ -44,79 +53,31 @@ export interface DeliveryType {
   };
 }
 
-// Delivery Table Columns
-
-
-
-// ---- Summary interface ----
-
-
 type OptionType = {
   id: string;
   username: string;
 };
 
 export default function DeliveryPage() {
-  // Delivery states
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
-  const [loadingDeliveries, setLoadingDeliveries] = useState(false);
-
-  // Summary & filters states
-  const [merchantFilter, setMerchantFilter] = useState<string | null>(null);
+  const [loadingDeliveries] = useState(false);
+  const [merchantFilter, setMerchantFilter] = useState<string>("");
   const [secondOptions, setSecondOptions] = useState<OptionType[]>([]);
-  const [secondValue, setSecondValue] = useState<string | null>(null);
+  const [secondValue, setSecondValue] = useState<string>("");
   const [loadingOptions, setLoadingOptions] = useState(false);
-  const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([null, null]);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [isReportMergeMode, setIsReportMergeMode] = useState(true);
-  const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
   const [summary, setSummary] = useState<SummaryType | null>(null);
   const [fetchingSummary, setFetchingSummary] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [tableData, setTableData] = useState<SummaryType[]>([]);
-  const [loading, setLoading] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [deliveryList, setDeliveryList] = useState<DeliveryType[]>([]);
-  const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
   const [drawerLoading, setDrawerLoading] = useState(false);
-  // Fetch deliveries with pagination
-  
-  const deliveryColumns: ColumnsType<DeliveryType> = [
-  
-    {
-      title: 'Мерчант',
-      dataIndex: ['merchant', 'username'],
-      render: (_, record) => record.merchant?.username || '-',
-    },
-    {
-      title: 'Утас',
-      dataIndex: 'phone',
-    },
-    {
-      title: 'Хаяг',
-      dataIndex: 'address',
-    },
-    {
-      title: 'Үнэ',
-      dataIndex: 'price',
-    },
-    {
-      title: 'Төлөв',
-      key: 'status',
-      render: (_, record) => {
-        const label = record.status_name?.status || 'N/A';
-        const color = record.status_name?.color || 'default';
-        return <Tag color={color}>{label}</Tag>;
-      },
-    },
-    {
-      title: 'Огноо',
-      dataIndex: 'createdAt',
-      render: (text: string) => dayjs(text).format('YYYY-MM-DD hh:mm A'),
-    },
-  ];
-  // Fetch options when merchantFilter changes
+
   useEffect(() => {
-    document.title = 'Тайлан харах';
+    document.title = "Тайлан харах";
 
     const fetchOptions = async () => {
       if (!merchantFilter) {
@@ -126,7 +87,7 @@ export default function DeliveryPage() {
       setLoadingOptions(true);
       try {
         const url =
-          merchantFilter === '1'
+          merchantFilter === "1"
             ? `${process.env.NEXT_PUBLIC_API_URL}/api/user/merchant`
             : `${process.env.NEXT_PUBLIC_API_URL}/api/user/drivers`;
 
@@ -138,7 +99,7 @@ export default function DeliveryPage() {
           setSecondOptions([]);
         }
       } catch (error) {
-        console.error('Fetch error:', error);
+        console.error("Fetch error:", error);
         setSecondOptions([]);
       } finally {
         setLoadingOptions(false);
@@ -146,10 +107,11 @@ export default function DeliveryPage() {
     };
 
     fetchOptions();
-    setSecondValue(null);
+    setSecondValue("");
     setSummary(null);
     setTableData([]);
   }, [merchantFilter]);
+
   const handleShowDeliveries = async (reportId: number) => {
     setDrawerVisible(true);
     setDrawerLoading(true);
@@ -163,25 +125,25 @@ export default function DeliveryPage() {
       setDrawerLoading(false);
     }
   };
-  // Fetch driver summary function
-  const fetchSummary = async (userId: string, startDate: string, endDate: string) => {
+
+  const fetchSummary = async (userId: string, start: string, end: string) => {
     setFetchingSummary(true);
     setFetchError(null);
-  
+
     try {
       const query = new URLSearchParams({
         user_id: userId,
-        startDate,
-        endDate,
+        startDate: start,
+        endDate: end,
       }).toString();
-  
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/summary?${query}`);
       const result = await response.json();
-  
+
       if (!response.ok || !result.success) {
-        throw new Error(result.message || 'Failed to fetch summary.');
+        throw new Error(result.message || "Failed to fetch summary.");
       }
-  
+
       setTableData(result.data || []);
     } catch (error: any) {
       setFetchError(`Error: ${error.message || error}`);
@@ -191,144 +153,172 @@ export default function DeliveryPage() {
       setFetchingSummary(false);
     }
   };
-  
 
-  const summaryColumns: ColumnsType<SummaryType> = [
-    {
-      title: 'Үүссэн огноо',
-      dataIndex: 'createdAt',
-      render: (text: string) => dayjs(text).format('YYYY-MM-DD hh:mm A'),
-    },
-    {
-      title: 'Мерчант нэр',
-      dataIndex: ['merchant', 'username'],
-      render: (_, record) => record.merchant?.username || '-',
-    },
-    {
-      title: 'Жолоочийн нэр',
-      dataIndex: ['driver', 'username'],
-      render: (_, record) => record.driver_summaries?.username || '-',
-    },
-      { title: 'Нийт', dataIndex: 'total' },
-    { title: 'Жолоочийн цалин', dataIndex: 'driver' },
-    { title: 'Тооцоо', dataIndex: 'account' },
-    {
-      title: 'Үзэх',
-      key: 'actions',
-      render: (_: any, record: SummaryType) => (
-        <Space>
-            <Button
-            type="link"
-            icon={<EyeOutlined />}
-            onClick={() => handleShowDeliveries(record.id)}
-          >
-            Хүргэлтүүд харах
-          </Button>
-        </Space>
-      ),
-    },
-  
-  ];
-  // Auto fetch summary on filters change
+  const onDateChange = (start: string, end: string) => {
+    if (start && end && secondValue) {
+      fetchSummary(secondValue, start, end);
+    }
+  };
+
+  const paged = tableData.slice((pagination.current - 1) * pagination.pageSize, pagination.current * pagination.pageSize);
+  const pageCount = Math.max(1, Math.ceil(tableData.length / pagination.pageSize));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      {/* Filters & Controls */}
-      <div className="flex gap-4 items-center w-full p-4" style={{ flexShrink: 0 }}>
-      <Switch
-  checked={isReportMergeMode}
-  onChange={(checked) => {
-    setIsReportMergeMode(checked);
-    setDateRange([null, null]);
-  }}
-  checkedChildren="Тайлан нийлэх"
-  unCheckedChildren="Тайлан харах"
-  style={{
-    backgroundColor: isReportMergeMode ? undefined : '#52c41a',
-    color: 'white',
-  }}
-/>
+    <div className="flex min-h-screen flex-col">
+      <div className="flex w-full flex-wrap items-center gap-4 p-4">
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={isReportMergeMode}
+            onCheckedChange={(checked) => {
+              setIsReportMergeMode(checked);
+              setStartDate("");
+              setEndDate("");
+            }}
+          />
+          <span className="text-sm">{isReportMergeMode ? "Тайлан нийлэх" : "Тайлан харах"}</span>
+        </div>
         <Select
-          value={merchantFilter}
-          onChange={(value) => {
+          value={merchantFilter || undefined}
+          onValueChange={(value) => {
             setMerchantFilter(value);
             setSummary(null);
             setFetchError(null);
             setTableData([]);
           }}
-          placeholder="Сонгох"
-          style={{ width: 150 }}
-          allowClear
         >
-          <Option value="1">Мерчант</Option>
-          <Option value="2">Жолооч</Option>
+          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Сонгох" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="1">Мерчант</SelectItem>
+            <SelectItem value="2">Жолооч</SelectItem>
+          </SelectContent>
         </Select>
-
         <Select
-          value={secondValue}
-          onChange={(value) => {
+          value={secondValue || undefined}
+          onValueChange={(value) => {
             setSecondValue(value);
             setSummary(null);
             setFetchError(null);
             setTableData([]);
           }}
-          placeholder="Select Option"
-          style={{ width: 200 }}
-          loading={loadingOptions}
-          allowClear
           disabled={!merchantFilter}
-          options={secondOptions.map((o) => ({ label: o.username, value: o.id }))}
-        />
-         <RangePicker
-  value={dateRange}
-  onChange={(dates) => {
-    setDateRange(dates ?? [null, null]);
-    if (dates && dates[0] && dates[1] && secondValue) {
-      fetchSummary(
-        secondValue,
-        dates[0].format('YYYY-MM-DD'),
-        dates[1].format('YYYY-MM-DD')
-      );
-    }
-  }}
-  format="YYYY-MM-DD"
-/>
-
-
-      </div>
-
-      {/* Delivery Data Table */}
-      <div style={{ flexGrow: 1, overflowY: 'auto', padding: '0 24px 80px 24px' }}>
-        <Table
-          columns={summaryColumns}
-          dataSource={tableData}
-          loading={loadingDeliveries}
-          pagination={{
-            current: pagination.current,
-            pageSize: pagination.pageSize,
-            total: pagination.total,
-            onChange: (page, pageSize) => setPagination({ current: page, pageSize, total: pagination.total }),
+        >
+          <SelectTrigger className="w-[200px]"><SelectValue placeholder={loadingOptions ? "Ачааллаж..." : "Select Option"} /></SelectTrigger>
+          <SelectContent>
+            {secondOptions.map((o) => (
+              <SelectItem key={o.id} value={String(o.id)}>{o.username}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input
+          type="date"
+          value={startDate}
+          onChange={(e) => {
+            setStartDate(e.target.value);
+            onDateChange(e.target.value, endDate);
           }}
-          rowKey="id"
-          scroll={{ x: 1200 }}
+          className="w-40"
         />
+        <Input
+          type="date"
+          value={endDate}
+          onChange={(e) => {
+            setEndDate(e.target.value);
+            onDateChange(startDate, e.target.value);
+          }}
+          className="w-40"
+        />
+        {fetchError && <div className="text-sm text-red-600">{fetchError}</div>}
       </div>
 
-      {/* Summary Table Fixed at Bottom */}
-      <Drawer
-        title="Холбогдох хүргэлтүүд"
-        placement="bottom"
-        onClose={() => setDrawerVisible(false)}
-        open={drawerVisible}
-        height="50%"
-      >
-        <Table
-          dataSource={deliveryList}
-          columns={deliveryColumns}
-          loading={drawerLoading}
-          rowKey="id"
-        />
-      </Drawer>
+      <div className="flex-1 overflow-y-auto px-6 pb-20">
+        <div className="border rounded-md">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Үүссэн огноо</TableHead>
+                <TableHead>Мерчант нэр</TableHead>
+                <TableHead>Жолоочийн нэр</TableHead>
+                <TableHead>Нийт</TableHead>
+                <TableHead>Жолоочийн цалин</TableHead>
+                <TableHead>Тооцоо</TableHead>
+                <TableHead>Үзэх</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loadingDeliveries || fetchingSummary ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Ачааллаж байна...</TableCell>
+                </TableRow>
+              ) : paged.map((record) => (
+                <TableRow key={record.id}>
+                  <TableCell>{dayjs(record.createdAt).format("YYYY-MM-DD hh:mm A")}</TableCell>
+                  <TableCell>{record.merchant?.username || "-"}</TableCell>
+                  <TableCell>{record.driver_summaries?.username || "-"}</TableCell>
+                  <TableCell>{record.total}</TableCell>
+                  <TableCell>{(record as any).driver}</TableCell>
+                  <TableCell>{record.account}</TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="sm" onClick={() => handleShowDeliveries(record.id)}>
+                      <Eye className="h-4 w-4" /> Хүргэлтүүд харах
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        <div className="mt-4 flex items-center gap-2">
+          <Button variant="outline" size="sm" disabled={pagination.current <= 1} onClick={() => setPagination((p) => ({ ...p, current: p.current - 1 }))}>
+            Өмнөх
+          </Button>
+          <span className="text-sm">{pagination.current} / {pageCount}</span>
+          <Button variant="outline" size="sm" disabled={pagination.current >= pageCount} onClick={() => setPagination((p) => ({ ...p, current: p.current + 1 }))}>
+            Дараах
+          </Button>
+        </div>
+      </div>
+
+      <Sheet open={drawerVisible} onOpenChange={setDrawerVisible}>
+        <SheetContent side="bottom" className="h-[50%]">
+          <SheetHeader>
+            <SheetTitle>Холбогдох хүргэлтүүд</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4 border rounded-md">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Мерчант</TableHead>
+                  <TableHead>Утас</TableHead>
+                  <TableHead>Хаяг</TableHead>
+                  <TableHead>Үнэ</TableHead>
+                  <TableHead>Төлөв</TableHead>
+                  <TableHead>Огноо</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {drawerLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">Ачааллаж байна...</TableCell>
+                  </TableRow>
+                ) : deliveryList.map((record) => (
+                  <TableRow key={record.id}>
+                    <TableCell>{record.merchant?.username || "-"}</TableCell>
+                    <TableCell>{record.phone}</TableCell>
+                    <TableCell>{record.address}</TableCell>
+                    <TableCell>{record.price}</TableCell>
+                    <TableCell>
+                      <Badge style={{ backgroundColor: record.status_name?.color || "#999", color: "#fff" }}>
+                        {record.status_name?.status || "N/A"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{dayjs(record.createdAt).format("YYYY-MM-DD hh:mm A")}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

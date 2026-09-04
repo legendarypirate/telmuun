@@ -4,7 +4,7 @@ module.exports = app => {
     var router = require("express").Router();
 
     router.patch("/:id/stock", good.updateStock);
-    // Create a new Tutorial
+    router.get("/:id/history", good.getHistory);
     router.post("/", good.create);
   
     // Retrieve all Tutorials

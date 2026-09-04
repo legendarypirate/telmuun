@@ -19,7 +19,9 @@ exports.create = (req, res) => {
     name: req.body.name,
     ware_id:req.body.ware_id,
     merchant_id:req.body.merchant_id,
-    stock:req.body.stock
+    stock:req.body.stock || 0,
+    in_delivery: 0,
+    delivered: 0
   };
 
   // Save Categories in the database
@@ -100,10 +102,45 @@ exports.updateStock = async (req, res) => {
 
     await good.save();
 
+    if (db.good_histories) {
+      try {
+        await db.good_histories.create({
+          good_id: id,
+          type: type,
+          amount: amount,
+          user_id: req.user?.id || null,
+          comment: type === 1 ? "Админ орлогодсон" : "Админ зарлагадсан",
+        });
+      } catch (historyErr) {
+        console.error("good history write skipped:", historyErr.message);
+      }
+    }
+
     res.send({ success: true, message: "Stock updated successfully.", data: good });
   } catch (error) {
     console.error(error);
     res.status(500).send({ message: "Error updating stock.", error });
+  }
+};
+
+exports.getHistory = async (req, res) => {
+  const goodId = req.params.id;
+  try {
+    if (!db.good_histories) {
+      return res.json({ success: true, data: [] });
+    }
+    const histories = await db.good_histories.findAll({
+      where: { good_id: goodId },
+      include: [
+        { model: db.users, as: "user", attributes: ["id", "username"], required: false },
+        { model: db.deliveries, as: "delivery", attributes: ["id", "status"], required: false },
+      ],
+      order: [["id", "DESC"]],
+    });
+    res.json({ success: true, data: histories });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Error fetching history" });
   }
 };
 
@@ -129,46 +166,43 @@ exports.findOne = (req, res) => {
 };
 
 // Update a Categories by the id in the request
-exports.update = (req, res) => {
+exports.update = async (req, res) => {
   const id = req.params.id;
+  const { name, ware_id } = req.body;
 
-  // Validate request (ensure at least one field is provided)
-  if (!req.body.brand && !req.body.nature) {
+  if (name === undefined && ware_id === undefined) {
     return res.status(400).json({
       success: false,
-      message: "Request body cannot be empty. At least brand or nature is required.",
+      message: "At least 'name' or 'ware_id' is required.",
     });
   }
 
-  // Prepare the data for updating
-  const updateData = {
-    brand: req.body.brand || null,
-    nature: req.body.nature || null,
-  };
-
-  // Update the category entry in the database
-  category.update(updateData, { where: { id: id } })
-    .then((num) => {
-      if (num[0] === 1) {
-        return category.findByPk(id); // Fetch the updated category
-      } else {
-        throw new Error("Category not found or no changes were made.");
-      }
-    })
-    .then((updatedCategory) => {
-      res.json({
-        success: true,
-        message: "Category was updated successfully.",
-        data: updatedCategory,
-      });
-    })
-    .catch((err) => {
-      res.status(500).json({
-        success: false,
-        message: "Error updating category with id=" + id,
-        error: err.message,
-      });
+  try {
+    const good = await Good.findByPk(id, {
+      include: [
+        { model: User, as: "merchant", attributes: ["id", "username"] },
+        { model: Ware, as: "ware", attributes: ["id", "name"] },
+      ],
     });
+    if (!good) {
+      return res.status(404).json({ success: false, message: `Good with id=${id} not found.` });
+    }
+
+    const updates = {};
+    if (name !== undefined) updates.name = String(name).trim();
+    if (ware_id !== undefined) updates.ware_id = Number(ware_id);
+    await good.update(updates);
+    await good.reload({
+      include: [
+        { model: User, as: "merchant", attributes: ["id", "username"] },
+        { model: Ware, as: "ware", attributes: ["id", "name"] },
+      ],
+    });
+    res.json({ success: true, message: "Good updated successfully.", data: good });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: error.message || "Error updating good." });
+  }
 };
 
 

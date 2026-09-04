@@ -1,385 +1,279 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
-import { Table, Button, Space, Drawer, Form, Input, Select, Modal, notification } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import { EditOutlined, DeleteOutlined, CloseOutlined } from '@ant-design/icons';
+import { useState, useEffect, useMemo } from 'react';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
+import { useGoods, useMerchants, useWares } from '@/hooks/use-lookups';
+import { queryKeys } from '@/lib/api';
+import GoodTable from './components/GoodTable';
+import GoodForm from './components/GoodForm';
+import { StockUpdateModal, EditGoodNameModal } from './components/GoodModals';
+import { GoodHistoryModal } from './components/GoodHistoryModal';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Good } from './types/good';
+import {
+  createGood,
+  deleteGood,
+  updateStock,
+  updateGood,
+} from './services/good.service';
 
-const { Option } = Select;
+export default function GoodPage() {
+  // State
+  const [merchantFilter, setMerchantFilter] = useState<number | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const queryClient = useQueryClient();
 
-interface Good {
-  id: number;
-  stock: number;
-  name: string;
-  merchant_id: number;
-  ware_id: number;
-  createdAt: string;
-  updatedAt: string;
-  merchant: {
-    id: number;
-    username: string;
-  };
-  ware: {
-    id: number;
-    name: string;
-  };
-}
+  // Form/Drawer
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-export default function UsersPage() {
-  const [good, setGood] = useState<Good[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [form] = Form.useForm();
-  const [merchants, setMerchants] = useState([]);
-  const [wares, setWares] = useState([]);
+  // Modals
+  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  const [isEditNameModalOpen, setIsEditNameModalOpen] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [selectedGood, setSelectedGood] = useState<Good | null>(null);
-  const [modalVisible, setModalVisible] = useState(false);
+
+  const { data: merchants = [] } = useMerchants();
+  const { data: wares = [] } = useWares();
+
+  // User info
   const [user, setUser] = useState<any>(null);
   const [username, setUsername] = useState<string | null>(null);
-  const [permissions, setPermissions] = useState<string[]>([]);
+  const isMerchant = user ? (user?.role === 2 || user?.role_id === 2) : false;
+  const merchantId = isMerchant ? (user?.id || user?.user_id || null) : null;
 
-  const isMerchant = user?.role === 2;
-  const merchantId = isMerchant ? user?.id : null;
-
+  // Load initial data
   useEffect(() => {
     document.title = 'Агуулахын бараа';
-    const saved = localStorage.getItem('permissions');
-    if (saved) setPermissions(JSON.parse(saved));
-    const fetchInitialData = async () => {
-      setLoading(true);
+
+    const storedUser = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+    const storedUsername =
+      typeof window !== 'undefined' ? localStorage.getItem('username') : null;
+
+    if (storedUser) {
       try {
-        // Get user from localStorage
-        const userData = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
-        const parsedUser = userData ? JSON.parse(userData) : null;
-        setUser(parsedUser);
-        setUsername(typeof window !== 'undefined' ? localStorage.getItem('username') : null);
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.error('Failed to parse user:', e);
+      }
+    }
+    if (storedUsername) setUsername(storedUsername);
+  }, []);
 
-        // Goods with optional merchant_id filter
-        let goodsUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/good`;
-        if (parsedUser?.role === 2) {
-          goodsUrl += `?merchant_id=${parsedUser.id}`;
-        }
+  const currentMerchantId = isMerchant ? merchantId : undefined;
+  const { data: goods = [], isFetching: loading } = useGoods(currentMerchantId || undefined);
 
-        const goodsRes = await fetch(goodsUrl);
-        const goodsResult = await goodsRes.json();
-        if (goodsResult.success) {
-          setGood(goodsResult.data);
-        }
+  const filteredGoods = useMemo(() => {
+    let filtered = goods as Good[];
+    if (merchantFilter != null) {
+      filtered = filtered.filter(
+        (good) => (good.merchant_id ?? good.merchant?.id) === merchantFilter
+      );
+    }
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter((good) =>
+        (good.name || '').toLowerCase().includes(searchLower)
+      );
+    }
+    return filtered;
+  }, [goods, merchantFilter, searchTerm]);
 
-        // Users (merchants)
-        const userRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/user`);
-        const userResult = await userRes.json();
-        if (userResult.success) {
-          setMerchants(userResult.data.filter((u: any) => u.role_id === 2));
-        }
+  const invalidateGoods = () => queryClient.invalidateQueries({ queryKey: queryKeys.goods(currentMerchantId || undefined) });
 
-        // Wares
-        const wareRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ware`);
-        const wareResult = await wareRes.json();
-        if (wareResult.success) {
-          setWares(wareResult.data);
-        }
-      } catch (err) {
-        console.error('Fetch error:', err);
-      } finally {
-        setLoading(false);
+  // Handlers
+  const handleCreateGood = async (payload: any) => {
+    try {
+      await createGood(payload);
+      await invalidateGoods();
+      toast.success('Бараа амжилттай үүсгэгдлээ');
+      setIsDrawerOpen(false);
+    } catch (error: any) {
+      toast.error(error.message || 'Бараа үүсгэхэд алдаа гарлаа');
+    }
+  };
+
+  const handleDeleteGood = (good: Good) => {
+    if (!confirm(`Та "${good.name}" барааг устгахдаа итгэлтэй байна уу?`)) {
+      return;
+    }
+
+    const deleteGoodAsync = async () => {
+      try {
+        await deleteGood(good.id);
+        await invalidateGoods();
+        toast.success(`"${good.name}" бараа амжилттай устгагдлаа`);
+      } catch (error: any) {
+        toast.error(error.message || 'Устгахад алдаа гарлаа');
       }
     };
 
-    fetchInitialData();
-  }, []);
-
-  const handleCreateGood = () => {
-    setDrawerVisible(true);
+    deleteGoodAsync();
   };
 
-  const handleDelete = async (id: number) => {
-    Modal.confirm({
-      title: 'Та энэ барааг устгахдаа итгэлтэй байна уу?',
-      okText: 'Тийм',
-      cancelText: 'Үгүй',
-      okType: 'danger',
-      onOk: async () => {
-        try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/good/${id}`, {
-            method: 'DELETE',
-          });
-  
-          const result = await response.json();
-  
-          if (result.success) {
-            setGood((prevGoods) => prevGoods.filter((g) => g.id !== id));
-            openNotification('success', 'Амжилттай устгалаа');
-          } else {
-            Modal.error({ title: 'Алдаа', content: result.message });
-          }
-        } catch (error) {
-          console.error('Устгах үед алдаа:', error);
-          Modal.error({ title: 'Алдаа', content: 'Устгах үед алдаа гарлаа' });
-        }
-      },
-    });
-  };
-  
-
-  const handleDrawerClose = () => {
-    setDrawerVisible(false);
-    form.resetFields();
+  const handleEditClick = (good: Good) => {
+    setSelectedGood(good);
+    setIsStockModalOpen(true);
   };
 
-  const openNotification = (type: 'success' | 'error' | 'warning', messageText: string) => {
-    let backgroundColor = '#52c41a'; // default green
-    if (type === 'error') backgroundColor = '#ff4d4f';
-    else if (type === 'warning') backgroundColor = '#fa8c16';
+  const handleEditNameClick = (good: Good) => {
+    setSelectedGood(good);
+    setIsEditNameModalOpen(true);
+  };
 
-    notification.open({
-      message: null,
-      description: <div style={{ color: 'white' }}>{messageText}</div>,
-      duration: 4,
-      style: {
-        backgroundColor,
-        borderRadius: '4px',
-      },
-      closeIcon: <CloseOutlined style={{ color: '#fff' }} />,
-    });
+  const handleSaveGoodName = async (name: string) => {
+    if (!selectedGood) return;
+    try {
+      await updateGood(selectedGood.id, { name });
+      await invalidateGoods();
+      setIsEditNameModalOpen(false);
+      setSelectedGood(null);
+      toast.success('Барааны нэр амжилттай шинэчлэгдлээ');
+    } catch (error: any) {
+      toast.error(error.message || 'Хадгалахад алдаа гарлаа');
+      throw error;
+    }
+  };
+
+  const handleHistoryClick = (good: Good) => {
+    setSelectedGood(good);
+    setIsHistoryModalOpen(true);
   };
 
   const handleStockUpdate = async (values: { type: number; amount: number }) => {
     if (!selectedGood) return;
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/good/${selectedGood.id}/stock`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: selectedGood.id,
-          type: values.type,
-          amount: Number(values.amount),
-        }),
+      await updateStock({
+        id: selectedGood.id,
+        type: values.type,
+        amount: values.amount,
       });
+      await invalidateGoods();
+      setIsStockModalOpen(false);
+      setSelectedGood(null);
 
-      const result = await response.json();
-      if (result.success) {
-        setGood((prevGoods) =>
-          prevGoods.map((good) =>
-            good.id === selectedGood.id ? { ...good, stock: result.data.stock } : good
-          )
-        );
-        setModalVisible(false);
-
-        if (values.type === 1) {
-          openNotification('success', 'Амжилттай орлогодолоо');
-        } else if (values.type === 2) {
-          openNotification('warning', 'Амжилттай зарлагадлаа');
-        }
-      } else {
-        Modal.error({ title: 'Error', content: result.message });
+      if (values.type === 1) {
+        toast.success('Амжилттай орлогодолоо');
+      } else if (values.type === 2) {
+        toast.warning('Амжилттай зарлагадлаа');
       }
-    } catch (error) {
-      console.error('Error updating stock:', error);
-      Modal.error({ title: 'Error', content: 'Failed to update stock' });
+    } catch (error: any) {
+      toast.error(error.message || 'Үлдэгдэл шинэчлэхэд алдаа гарлаа');
     }
   };
 
-  const handleFormSubmit = async () => {
-    try {
-      const values = await form.validateFields();
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/good`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(values),
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        setGood((prev) => [...prev, result.data]);
-        handleDrawerClose();
-      } else {
-        console.error('Failed to create good:', result.message);
-      }
-    } catch (error) {
-      console.error('Validation or request failed:', error);
-    }
-  };
-  const hasPermission = (perm: string) => permissions.includes(perm);
-
-  const baseColumns: ColumnsType<Good> = [
-    {
-      title: 'Агуулах',
-      dataIndex: ['ware', 'name'],
-    },
-    {
-      title: 'Дэлгүүр',
-      dataIndex: ['merchant', 'username'],
-    },
-    {
-      title: 'Барааны нэр',
-      dataIndex: 'name',
-    },
-    {
-      title: 'Үлдэгдэл',
-      dataIndex: 'stock',
-    },
-  ];
-
-  if (!isMerchant) {
-    baseColumns.push({
-      title: 'Actions',
-      key: 'actions',
-      render: (_, record) => (
-        <Space>
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => {
-              setSelectedGood(record);
-              setModalVisible(true);
-            }}
-          >
-            Орлогодох
-          </Button>
-  
-          <Button
-  type="link"
-  danger
-  icon={<DeleteOutlined />}
-  onClick={() => handleDelete(record.id)}
->
-  Устгах
-</Button>
-
-        </Space>
-      ),
-    });
-  }
-  
-  const columns = baseColumns;
   return (
-    <div>
-      <h1 style={{ marginBottom: 24 }}>Агуулахын бараа</h1>
-      <Space style={{ marginBottom: 16, width: '100%' }} wrap>
-      {hasPermission('good:create_good') && (
+    <div className="w-full mt-6 px-4 pb-32">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-gray-900">Агуулахын бараа</h1>
+        {!isMerchant && (
+          <Button onClick={() => setIsDrawerOpen(true)}>+ Бараа үүсгэх</Button>
+        )}
+      </div>
 
-        <Button
-          type="primary"
-          style={{ marginLeft: 'auto' }}
-          onClick={handleCreateGood}
-        >
-          + Бараа үүсгэх
-        </Button>
-      )}
-      </Space>
-
-      <Table columns={columns} dataSource={good} rowKey="id" loading={loading} />
-
-      <Drawer
-        title="Бараа үүсгэх"
-        width={400}
-        onClose={handleDrawerClose}
-        visible={drawerVisible}
-        bodyStyle={{ paddingBottom: 80 }}
-      >
-        <Form layout="vertical" form={form} onFinish={handleFormSubmit}>
-          <Form.Item name="name" label="Барааны нэр" rules={[{ required: true }]}>
-            <Input placeholder="Барааны нэр" />
-          </Form.Item>
-          <Form.Item name="stock" label="Үлдэгдэл" rules={[{ required: true }]}>
-            <Input type="number" placeholder="Үлдэгдэл" />
-          </Form.Item>
-
-          {isMerchant ? (
-            <>
-              <Form.Item label="Дэлгүүр">
-                <div
-                  style={{
-                    padding: '4px 11px',
-                    border: '1px solid #d9d9d9',
-                    borderRadius: 2,
-                    backgroundColor: '#f5f5f5',
-                    color: 'rgba(0, 0, 0, 0.85)',
-                    minHeight: 32,
-                  }}
-                >
-                  {username}
-                </div>
-              </Form.Item>
-              <Form.Item name="merchant_id" initialValue={merchantId} hidden>
-                <Input />
-              </Form.Item>
-            </>
-          ) : (
-            <Form.Item
-              name="merchant_id"
-              label="Дэлгүүр"
-              rules={[{ required: true, message: 'Дэлгүүр сонгоно уу!' }]}
-            >
-              <Select placeholder="Дэлгүүр сонгох">
-                {merchants.map((merchant: any) => (
-                  <Option key={merchant.id} value={merchant.id}>
-                    {merchant.username}
-                  </Option>
+      {!isMerchant && (
+        <div className="mb-4 flex items-center gap-4">
+          <Select
+            value={merchantFilter?.toString() || 'all'}
+            onValueChange={(value) => setMerchantFilter(value === 'all' ? null : parseInt(value))}
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Дэлгүүрээр шүүх" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Бүгд</SelectItem>
+              {merchants
+                .filter((merchant) => merchant?.id != null)
+                .map((merchant) => (
+                  <SelectItem key={merchant.id} value={String(merchant.id)}>
+                    {merchant.username || `ID ${merchant.id}`}
+                  </SelectItem>
                 ))}
-              </Select>
-            </Form.Item>
-          )}
+            </SelectContent>
+          </Select>
+          <Input
+            type="text"
+            placeholder="Барааны нэрээр хайх..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-64"
+          />
+        </div>
+      )}
+      {isMerchant && (
+        <div className="mb-4">
+          <Input
+            type="text"
+            placeholder="Барааны нэрээр хайх..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-64"
+          />
+        </div>
+      )}
 
-          <Form.Item name="ware_id" label="Агуулах" rules={[{ required: true }]}>
-            <Select placeholder="Агуулах сонгох">
-              {wares.map((ware: any) => (
-                <Option key={ware.id} value={ware.id}>
-                  {ware.name}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
+      <GoodTable
+        goods={filteredGoods}
+        loading={loading}
+        onEdit={handleEditClick}
+        onEditName={!isMerchant ? handleEditNameClick : undefined}
+        onDelete={handleDeleteGood}
+        onHistory={handleHistoryClick}
+        isMerchant={isMerchant}
+      />
 
-          <Form.Item>
-            <Button type="primary" htmlType="submit" block>
-              Хадгалах
-            </Button>
-          </Form.Item>
-        </Form>
-      </Drawer>
+      {/* Drawer */}
+      <GoodForm
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        onSubmit={handleCreateGood}
+        merchants={merchants}
+        wares={wares}
+        isMerchant={isMerchant}
+        merchantId={merchantId || undefined}
+        username={username || undefined}
+      />
 
-      <Modal
-        title={`Орлого эсвэл Зарлага`}
-        visible={modalVisible}
-        onCancel={() => setModalVisible(false)}
-        footer={null}
-        centered
-      >
-        <p><strong>Бараа:</strong> {selectedGood?.name}</p>
-        <Form onFinish={handleStockUpdate} layout="vertical">
-          <Form.Item
-            name="type"
-            label="Төрөл"
-            rules={[{ required: true, message: 'Төрлийг сонгоно уу' }]}
-          >
-            <Select placeholder="Төрөл сонгох">
-              <Option value={1}>Орлого</Option>
-              <Option value={2}>Зарлага</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item
-            name="amount"
-            label="Тоо хэмжээ"
-            rules={[{ required: true, message: 'Тоо хэмжээг оруулна уу' }]}
-          >
-            <Input type="number" placeholder="Тоо хэмжээ" />
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" htmlType="submit" block>
-              Хадгалах
-            </Button>
-          </Form.Item>
-        </Form>
-      </Modal>
+      {/* Stock Update Modal */}
+      <StockUpdateModal
+        isOpen={isStockModalOpen}
+        onClose={() => {
+          setIsStockModalOpen(false);
+          setSelectedGood(null);
+        }}
+        onSave={handleStockUpdate}
+        good={selectedGood}
+      />
+
+      <EditGoodNameModal
+        isOpen={isEditNameModalOpen}
+        onClose={() => {
+          setIsEditNameModalOpen(false);
+          setSelectedGood(null);
+        }}
+        onSave={handleSaveGoodName}
+        good={selectedGood}
+      />
+
+      {/* History Modal */}
+      <GoodHistoryModal
+        isOpen={isHistoryModalOpen}
+        onClose={() => {
+          setIsHistoryModalOpen(false);
+          setSelectedGood(null);
+        }}
+        good={selectedGood}
+      />
     </div>
   );
 }
+

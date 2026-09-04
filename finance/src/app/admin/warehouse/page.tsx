@@ -1,241 +1,74 @@
-'use client';
+"use client";
 
-import React, { useState, useMemo,useRef,useEffect } from 'react';
-import { Table, Button, Space, Input, DatePicker, Drawer, Form ,Select,Tag,Modal} from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
-import moment, { Moment } from 'moment';
-import dayjs, { Dayjs } from 'dayjs';
-import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
-import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
-import * as XLSX from 'xlsx';
-const { Option } = Select;
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { useWares } from "@/hooks/use-lookups";
+import { queryKeys } from "@/lib/api";
+import WarehouseTable from "./components/WarehouseTable";
+import WarehouseForm from "./components/WarehouseForm";
+import { Button } from "@/components/ui/button";
+import { Warehouse } from "./types/warehouse";
+import { createWarehouse, deleteWarehouse } from "./services/warehouse.service";
 
-const { RangePicker } = DatePicker;
-dayjs.extend(isSameOrAfter);
-dayjs.extend(isSameOrBefore);
-interface Region {
-  id: number;
-  name: string;
-}
+export default function WarehousePage() {
+  const queryClient = useQueryClient();
+  const { data: warehouses = [], isFetching: loading } = useWares();
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
+  useEffect(() => {
+    document.title = "Агуулах";
+  }, []);
 
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.wares });
 
-export default function DeliveryPage() {
-  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
-  const [form] = Form.useForm();
-  const [isDrawerVisible, setIsDrawerVisible] = useState(false);
-  const [regionData, setRegionData] = useState<Region[]>([]);
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
-
-const columns: ColumnsType<Region> = [
-  {
-    title: 'Үүссэн огноо',
-    dataIndex: 'createdAt',
-    render: (text: string) => {
-      return dayjs(text).format('YYYY-MM-DD hh:mm A'); // Format the date here
-    },
-  },
-
-  {
-    title: 'Нэр',
-    dataIndex: 'name',
-    key: 'name',
-    render: (_: any, record: any) => (
-      <Tag color={record.color}>
-        {record.name}
-      </Tag>
-    ),
-  }, {
-    title: 'Үйлдэл',
-    key: 'actions',
-    render: (_: any, record: Region) => (
-      <Space>
-        <Button
-          type="link"
-          icon={<EditOutlined />}
-          onClick={() => alert(`Edit ${record.name}`)}
-        >
-          Edit
-        </Button>
-        <Button
-          type="link"
-          danger
-          icon={<DeleteOutlined />}
-          onClick={() => handleDelete(record.id)}
-        >
-          Delete
-        </Button>
-      </Space>
-    ),
-  },
-];
-
-  const handleDelete = async (id: number) => {
+  const handleCreateWarehouse = async (payload: { name: string }) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ware/${id}`, {
-        method: "DELETE",
-      });
-  
-      if (response.ok) {
-        console.log("Deleted successfully");
-        const refreshed = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ware`);
-        const refreshedResult = await refreshed.json();
-        if (refreshedResult.success) {
-            setRegionData(refreshedResult.data);
-        }
-      } else {
-        console.error("Failed to delete");
-      }
-    } catch (error) {
-      console.error("Error deleting:", error);
+      await createWarehouse(payload);
+      await invalidate();
+      toast.success("Агуулах амжилттай үүсгэгдлээ");
+      setIsDrawerOpen(false);
+    } catch (error: any) {
+      toast.error(error.message || "Агуулах үүсгэхэд алдаа гарлаа");
     }
   };
-  useEffect(() => {
-    document.title = 'Хүргэлтийн төлөв';
-    const fetchData = async () => {
+
+  const handleDeleteWarehouse = (warehouse: Warehouse) => {
+    if (!confirm(`Та "${warehouse.name}" агуулхыг устгахдаа итгэлтэй байна уу?`)) {
+      return;
+    }
+
+    const deleteWarehouseAsync = async () => {
       try {
-     
-  
-        // Always fetch deliveries on page/size change
-        const deliveryRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ware`);
-        const deliveriesResult = await deliveryRes.json();
-  
-        if (deliveriesResult.success) {
-            setRegionData(deliveriesResult.data);
-          
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
+        await deleteWarehouse(warehouse.id);
+        await invalidate();
+        toast.success(`"${warehouse.name}" агуулах амжилттай устгагдлаа`);
+      } catch (error: any) {
+        toast.error(error.message || "Устгахад алдаа гарлаа");
       }
     };
-  
-    fetchData();
-  }, [pagination.current, pagination.pageSize]);
-  
-  
-  
-  const rowSelection = {
-    selectedRowKeys,
-    onChange: (selectedKeys: React.Key[]) => {
-      setSelectedRowKeys(selectedKeys);
-    },
-  };
 
-  const handleDeliveryButton = () => {
-    setIsDrawerVisible(true);
-  };
-
-  // Handle form submission (for example, you could save data here)
-  const handleOk = async () => {
-    try {
-      const values = await form.validateFields();
-  
-      // Construct the request payload
-      const payload = {
-        name: values.name,
-      };
-  
-      // Send the POST request
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ware`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-  
-      const result = await response.json();
-  
-      if (result.success) {
-        // Optionally refresh the delivery list
-        const refreshed = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ware`);
-        const refreshedResult = await refreshed.json();
-        if (refreshedResult.success) {
-            setRegionData(refreshedResult.data);
-        }
-  
-        // Reset form and close drawer
-        form.resetFields();
-        setIsDrawerVisible(false);
-      } else {
-        console.error('Failed to create delivery:', result.message);
-      }
-    } catch (err) {
-      console.error('Validation or request error:', err);
-    }
-  };
-
-
-  const handleCloseDrawer = () => {
-    setIsDrawerVisible(false);
+    deleteWarehouseAsync();
   };
 
   return (
-    <div style={{ paddingBottom: '100px' }}> {/* Adding padding to prevent overlap with fixed button */}
-      <h1 style={{ marginBottom: 24 }}>Агуулах</h1>
+    <div className="w-full mt-6 px-4 pb-32">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-gray-900">Агуулах</h1>
+        <Button onClick={() => setIsDrawerOpen(true)}>+ Агуулах үүсгэх</Button>
+      </div>
 
-      <Space style={{ marginBottom: 16 }} wrap>
-       
-         <Button
-          type="primary"
-          style={{ marginLeft: 'auto' }}
-          onClick={handleDeliveryButton}
-        >
-          + Агуулах үүсгэх
-        </Button>
-      </Space>
+      <WarehouseTable
+        warehouses={warehouses as Warehouse[]}
+        loading={loading}
+        onDelete={handleDeleteWarehouse}
+      />
 
-      <Table
-  rowSelection={rowSelection}
-  columns={columns}
-  dataSource={regionData}
-  rowKey="id"
-  pagination={{
-    position: ['topRight'], // 👈 This moves pagination to top-right
-    current: pagination.current,
-    pageSize: pagination.pageSize,
-    total: pagination.total,
-    showSizeChanger: true,
-    onChange: (page, pageSize) => {
-      setPagination((prev) => ({
-        ...prev,
-        current: page,
-        pageSize: pageSize,
-      }));
-    },
-  }}
-/>
-
-
- <Drawer
-        title="Агуулах үүсгэх"
-        placement="right"
-        visible={isDrawerVisible}
-        onClose={handleCloseDrawer}
-        width="400px"  // Adjust the width as needed
-        height="100%"  // Full height
-        bodyStyle={{ padding: '20px' }}
-      >
-        <Form form={form} layout="vertical">
-
-          <Form.Item
-            label="Агуулахын нэр"
-            name="name"
-            rules={[{ required: true, message: 'Please input the ware!' }]}
-          >
-            <Input placeholder="Нэр оруулах" />
-          </Form.Item>
-        
-          <Form.Item>
-            <Button type="primary" onClick={handleOk} block>
-              Үүсгэх
-            </Button>
-          </Form.Item>
-        </Form>
-      </Drawer>
-      {/* Fixed Bottom Section */}
-      
+      <WarehouseForm
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        onSubmit={handleCreateWarehouse}
+      />
     </div>
   );
 }

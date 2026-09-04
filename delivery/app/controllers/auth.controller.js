@@ -1,10 +1,10 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs"); // Using bcryptjs for hashing and comparing passwords
 const db = require("../models");
-const User = db.users;  // Assuming your users table is named 'users'
-const secretKey = 'your_secret_key';  // You can store this key in .env for better security
+const User = db.users; // Assuming your users table is named 'users'
+const secretKey = "your_secret_key"; // You can store this key in .env for better security
 const axios = require("axios");
-const getPermissionsForRole = db.role_permissions;  // Assuming your users table is named 'users'
+const getPermissionsForRole = db.role_permissions; // Assuming your users table is named 'users'
 
 // Register a new user
 exports.register = async (req, res) => {
@@ -19,15 +19,27 @@ exports.register = async (req, res) => {
   } = req.body;
 
   // Basic required checks
-  if (!username || !password || !firstName || !lastName || !email || !phone || !registrationNumber) {
-    return res.status(400).json({ message: "Бүх шаардлагатай талбарыг бөглөнө үү!" });
+  if (
+    !username ||
+    !password ||
+    !firstName ||
+    !lastName ||
+    !email ||
+    !phone ||
+    !registrationNumber
+  ) {
+    return res
+      .status(400)
+      .json({ message: "Бүх шаардлагатай талбарыг бөглөнө үү!" });
   }
 
   try {
     // Check if user already exists
     const existingUser = await User.findOne({ where: { username } });
     if (existingUser) {
-      return res.status(400).json({ message: "Хэрэглэгч аль хэдийн бүртгэгдсэн байна!" });
+      return res
+        .status(400)
+        .json({ message: "Хэрэглэгч аль хэдийн бүртгэгдсэн байна!" });
     }
 
     // Hash the password
@@ -47,10 +59,11 @@ exports.register = async (req, res) => {
     });
 
     // Generate JWT token (optional, you might want to restrict actions until approved)
-  
+
     res.status(201).json({
       success: true,
-      message: "Таны хүсэлт амжилттай илгээгдлээ, админ зөвшөөрсний дараа идэвхжүүлэх болно.",
+      message:
+        "Таны хүсэлт амжилттай илгээгдлээ, админ зөвшөөрсний дараа идэвхжүүлэх болно.",
       user: {
         id: newUser.id,
         username: newUser.username,
@@ -68,13 +81,14 @@ exports.register = async (req, res) => {
   }
 };
 
-
 // Login user without role restriction
 exports.login = async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
-    return res.status(400).json({ message: "Username and password are required!" });
+    return res
+      .status(400)
+      .json({ message: "Username and password are required!" });
   }
 
   try {
@@ -88,20 +102,24 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials!" });
     }
 
- 
-
     // Fetch permissions via role_permissions join table
     const rolePermissions = await db.role_permissions.findAll({
       where: { role_id: user.role_id },
-      include: [{
-        model: db.permissions,
-        as: 'permission',
-        attributes: ['module', 'action'],
-      }],
+      include: [
+        {
+          model: db.permissions,
+          as: "permission",
+          attributes: ["module", "action"],
+        },
+      ],
     });
 
     const permissions = rolePermissions
-      .map(rp => rp.permission ? `${rp.permission.module}:${rp.permission.action}` : null)
+      .map((rp) =>
+        rp.permission
+          ? `${rp.permission.module}:${rp.permission.action}`
+          : null,
+      )
       .filter(Boolean);
 
     const tokenPayload = {
@@ -129,18 +147,19 @@ exports.login = async (req, res) => {
   }
 };
 
-
 exports.mobile_login = async (req, res) => {
   const { phone, password } = req.body;
 
   if (!phone || !password) {
-    return res.status(400).json({ message: "phone and password are required!" });
+    return res
+      .status(400)
+      .json({ message: "phone and password are required!" });
   }
 
   try {
     const user = await User.findOne({ where: { phone } });
 
-    if (!user ) {
+    if (!user) {
       return res.status(401).json({ message: "Invalid credentials!" });
     }
 
@@ -150,7 +169,11 @@ exports.mobile_login = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials!" });
     }
 
-    const token = jwt.sign({ id: user.id, phone: user.phone, role: user.role }, secretKey, { expiresIn: "30m" });
+    const token = jwt.sign(
+      { id: user.id, phone: user.phone, role: user.role },
+      secretKey,
+      { expiresIn: "30m" },
+    );
 
     res.json({
       success: true,
@@ -158,8 +181,8 @@ exports.mobile_login = async (req, res) => {
       user: {
         id: user.id,
         phone: user.phone,
-        role: user.role
-      }
+        role: user.role,
+      },
     });
   } catch (err) {
     console.error(err);
@@ -183,13 +206,14 @@ exports.verifyToken = (req, res, next) => {
   });
 };
 
-
 exports.mobile_register = async (req, res) => {
-  const { lastname, firstname,company,position, email, phone } = req.body;
+  const { lastname, firstname, company, position, email, phone } = req.body;
   console.log(req.body);
 
   if (!lastname || !firstname || !company) {
-    return res.status(400).json({ message: "lastname, firstname, and company are required!" });
+    return res
+      .status(400)
+      .json({ message: "lastname, firstname, and company are required!" });
   }
 
   try {
@@ -210,7 +234,7 @@ exports.mobile_register = async (req, res) => {
       position,
       email,
       phone,
-      otp: randomOTP
+      otp: randomOTP,
     });
 
     console.log("Inserted user:", newUser.toJSON());
@@ -219,12 +243,12 @@ exports.mobile_register = async (req, res) => {
     const token = jwt.sign(
       { id: newUser.id, username: newUser.username, phone: newUser.phone },
       secretKey,
-      { expiresIn: "30m" }
+      { expiresIn: "30m" },
     );
 
     // Send OTP via SMS
     const smsUrl = `https://api.messagepro.mn/send?from=72278880&to=${phone}&text=Tanii neg udaagiin nuuts code ${randomOTP}`;
-    
+
     const headers = {
       "x-api-key": "d1856eb0c137cb4dc7e43dc2efdfd43a", // Your API key
       "Content-Type": "application/json",
@@ -236,7 +260,7 @@ exports.mobile_register = async (req, res) => {
     } catch (smsError) {
       console.error(
         "Error sending SMS:",
-        smsError.response ? smsError.response.data : smsError.message
+        smsError.response ? smsError.response.data : smsError.message,
       );
     }
 
@@ -252,8 +276,8 @@ exports.mobile_register = async (req, res) => {
         email: newUser.email,
         phone: newUser.phone,
         company: newUser.company,
-        position: newUser.position
-      }
+        position: newUser.position,
+      },
     });
   } catch (err) {
     console.error(err);
@@ -282,7 +306,10 @@ exports.verifyOtp = async (req, res) => {
     }
 
     // Update user as verified
-    await User.update({ otp: null, phone_verified: true }, { where: { id: id } });
+    await User.update(
+      { otp: null, phone_verified: true },
+      { where: { id: id } },
+    );
 
     res.json({ success: true, message: "Phone verified successfully!" });
   } catch (err) {
@@ -296,7 +323,7 @@ exports.updateInfo = async (req, res) => {
     const { id, password } = req.body;
 
     // Validate required fields
-    if (!id ) {
+    if (!id) {
       return res.status(400).json({ message: "User ID  are required!" });
     }
 
@@ -308,7 +335,7 @@ exports.updateInfo = async (req, res) => {
     }
 
     // Prepare data for update
-    const updatedData = { };
+    const updatedData = {};
 
     // If a new password is provided, hash it before saving
     if (password) {

@@ -1,10 +1,19 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Typography, Space, Spin, Alert, message, Table, Input, Button } from 'antd';
-import { FolderOutlined, UserOutlined, CloseOutlined, SaveOutlined } from '@ant-design/icons';
-
-const { Title, Text } = Typography;
+import React, { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { Folder, User, X, Save } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface Driver {
   id: number;
@@ -27,16 +36,17 @@ export default function DriversPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const [panelVisible, setPanelVisible] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [bulks, setBulks] = useState<Bulk[]>([]);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [editingAmounts, setEditingAmounts] = useState<{ [key: number]: number }>({});
   const [editingDiffs, setEditingDiffs] = useState<{ [key: number]: number }>({});
-  const [saving, setSaving] = useState<{ id: number; type: 'amount' | 'diff' } | null>(null);
+  const [saving, setSaving] = useState<{ id: number; type: "amount" | "diff" } | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 5;
 
-  // Fetch all drivers
   useEffect(() => {
     const fetchDrivers = async () => {
       try {
@@ -44,9 +54,9 @@ export default function DriversPage() {
         if (!response.ok) throw new Error(`Failed to fetch drivers: ${response.status}`);
         const data = await response.json();
         if (data.success) setDrivers(data.data);
-        else throw new Error('API returned unsuccessful response');
+        else throw new Error("API returned unsuccessful response");
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
+        setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
         setLoading(false);
       }
@@ -71,13 +81,14 @@ export default function DriversPage() {
         setEditingAmounts(initialAmounts);
         setEditingDiffs(initialDiffs);
       } else {
-        message.warning(data.message || 'No bulk report found for this driver.');
+        toast.error(data.message || "No bulk report found for this driver.");
         setBulks([]);
       }
       setSelectedDriver(driver);
       setPanelVisible(true);
+      setPage(1);
     } catch (err) {
-      message.error(err instanceof Error ? err.message : 'Error fetching bulk report');
+      toast.error(err instanceof Error ? err.message : "Error fetching bulk report");
     } finally {
       setBulkLoading(false);
     }
@@ -100,11 +111,11 @@ export default function DriversPage() {
   };
 
   const updateBulkAmount = async (bulkId: number) => {
-    setSaving({ id: bulkId, type: 'amount' });
+    setSaving({ id: bulkId, type: "amount" });
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/delivery/bulk/${bulkId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: editingAmounts[bulkId],
         }),
@@ -114,16 +125,14 @@ export default function DriversPage() {
       const data = await response.json();
       if (data.success) {
         setBulks((prev) =>
-          prev.map((bulk) =>
-            bulk.id === bulkId ? { ...bulk, amount: editingAmounts[bulkId] } : bulk
-          )
+          prev.map((bulk) => (bulk.id === bulkId ? { ...bulk, amount: editingAmounts[bulkId] } : bulk))
         );
-        message.success('Amount updated successfully');
+        toast.success("Amount updated successfully");
       } else {
-        throw new Error(data.message || 'Failed to update amount');
+        throw new Error(data.message || "Failed to update amount");
       }
     } catch (err) {
-      message.error(err instanceof Error ? err.message : 'Error updating amount');
+      toast.error(err instanceof Error ? err.message : "Error updating amount");
       const originalAmount = bulks.find((b) => b.id === bulkId)?.amount || 0;
       setEditingAmounts((prev) => ({
         ...prev,
@@ -134,40 +143,38 @@ export default function DriversPage() {
     }
   };
 
-const updateBulkDiff = async (bulkId: number) => {
-  setSaving({ id: bulkId, type: 'diff' });
-  try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/delivery/bulk/${bulkId}/diff`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        diff: editingDiffs[bulkId],
-      }),
-    });
+  const updateBulkDiff = async (bulkId: number) => {
+    setSaving({ id: bulkId, type: "diff" });
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/delivery/bulk/${bulkId}/diff`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          diff: editingDiffs[bulkId],
+        }),
+      });
 
-    if (!response.ok) throw new Error(`Failed to update diff: ${response.status}`);
-    const data = await response.json();
-    if (data.success) {
-      setBulks((prev) =>
-        prev.map((bulk) =>
-          bulk.id === bulkId ? { ...bulk, diff: editingDiffs[bulkId] } : bulk
-        )
-      );
-      message.success('Зөрүү updated successfully');
-    } else {
-      throw new Error(data.message || 'Failed to update diff');
+      if (!response.ok) throw new Error(`Failed to update diff: ${response.status}`);
+      const data = await response.json();
+      if (data.success) {
+        setBulks((prev) =>
+          prev.map((bulk) => (bulk.id === bulkId ? { ...bulk, diff: editingDiffs[bulkId] } : bulk))
+        );
+        toast.success("Зөрүү updated successfully");
+      } else {
+        throw new Error(data.message || "Failed to update diff");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error updating diff");
+      const originalDiff = bulks.find((b) => b.id === bulkId)?.diff || 0;
+      setEditingDiffs((prev) => ({
+        ...prev,
+        [bulkId]: originalDiff,
+      }));
+    } finally {
+      setSaving(null);
     }
-  } catch (err) {
-    message.error(err instanceof Error ? err.message : 'Error updating diff');
-    const originalDiff = bulks.find((b) => b.id === bulkId)?.diff || 0;
-    setEditingDiffs((prev) => ({
-      ...prev,
-      [bulkId]: originalDiff,
-    }));
-  } finally {
-    setSaving(null);
-  }
-};
+  };
 
   const handleClosePanel = () => {
     setPanelVisible(false);
@@ -177,191 +184,141 @@ const updateBulkDiff = async (bulkId: number) => {
     setEditingDiffs({});
   };
 
-  const bulkColumns = [
-{ 
-      title: 'Тайлангйин огноо', 
-      dataIndex: 'report_date', 
-      key: 'report_date',
-      width: 140,
-      render: (date: string) => (
-        <Text>{date ? new Date(date).toISOString().slice(0, 10) : '-'}</Text>
-      ),
-    },
-    { title: 'Тоо', dataIndex: 'count', key: 'count', width: 80 },
-    { title: 'Хүргэгдсэн', dataIndex: 'deliveredCount', key: 'deliveredCount', width: 100 },
-    { 
-      title: 'Дүн', 
-      dataIndex: 'amount', 
-      key: 'amount',
-      width: 200,
-      render: (amount: number, record: Bulk) => (
-        <Space size="small">
-          <Input
-            type="number"
-            value={editingAmounts[record.id]}
-            onChange={(e) => handleAmountChange(record.id, e.target.value)}
-            style={{ width: 120, fontSize: '13px', textAlign: 'right' }}
-            size="small"
-          />
-          <Button
-            type="primary"
-            icon={<SaveOutlined />}
-            size="small"
-            loading={saving?.id === record.id && saving?.type === 'amount'}
-            onClick={() => updateBulkAmount(record.id)}
-          />
-        </Space>
-      ),
-    },
-    { 
-      title: 'Зөрүү', 
-      dataIndex: 'diff', 
-      key: 'diff',
-      width: 200,
-      render: (diff: number, record: Bulk) => (
-        <Space size="small">
-          <Input
-            type="number"
-            value={editingDiffs[record.id]}
-            onChange={(e) => handleDiffChange(record.id, e.target.value)}
-            style={{ width: 120, fontSize: '13px', textAlign: 'right' }}
-            size="small"
-          />
-          <Button
-            type="primary"
-            icon={<SaveOutlined />}
-            size="small"
-            loading={saving?.id === record.id && saving?.type === 'diff'}
-            onClick={() => updateBulkDiff(record.id)}
-          />
-        </Space>
-      ),
-    },
-    { title: 'Хүргэлтэнд гарса', dataIndex: 'paid', key: 'paid', width: 80 },
-    
-  ];
-
   if (error) {
     return (
-      <div style={{ padding: '24px' }}>
-        <Alert message="Error Loading Drivers" description={error} type="error" showIcon />
+      <div className="p-6">
+        <p className="font-semibold">Error Loading Drivers</p>
+        <p className="text-sm text-muted-foreground">{error}</p>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div style={{ padding: '24px', textAlign: 'center' }}>
-        <Spin size="large" />
-        <div style={{ marginTop: 16 }}>
-          <Text>Loading drivers...</Text>
-        </div>
+      <div className="p-6 text-center">
+        <p>Loading drivers...</p>
       </div>
     );
   }
 
-  return (
-    <div style={{ padding: '24px', minHeight: '100vh', background: '#f5f5f5' }}>
-      <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        {/* Page Header */}
-        <div>
-          <Title level={2} style={{ margin: 0, color: '#1890ff' }}>
-            <UserOutlined /> Жолоочийн тайлан
-          </Title>
-          <Text type="secondary">
-            Total {drivers.length} driver{drivers.length !== 1 ? 's' : ''} found
-          </Text>
-        </div>
+  const paged = bulks.slice((page - 1) * pageSize, page * pageSize);
+  const pageCount = Math.max(1, Math.ceil(bulks.length / pageSize));
 
-        {/* Drivers Grid */}
-        <Row gutter={[24, 24]}>
-          {drivers.map((driver) => (
-            <Col key={driver.id} xs={24} sm={12} md={8} lg={6}>
+  return (
+    <div className="min-h-full">
+      <div className="space-y-6">
+        <div>
+          <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
+            <User className="h-6 w-6" /> Жолоочийн тайлан
+          </h2>
+          <p className="text-sm text-muted-foreground">{drivers.length} жолооч</p>
+        </div>
+        <Input
+          placeholder="Жолоочийн нэрээр хайх..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-xs"
+        />
+
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+          {drivers
+            .filter((driver) => (driver.username || "").toLowerCase().includes(searchTerm.toLowerCase().trim()))
+            .map((driver) => (
               <Card
-                hoverable
-                style={{
-                  textAlign: 'center',
-                  borderRadius: '12px',
-                  minHeight: '140px',
-                  border: '2px solid #f0f0f0',
-                  cursor: 'pointer',
-                }}
-                bodyStyle={{ padding: '16px 8px' }}
+                key={driver.id}
+                className="min-h-[140px] cursor-pointer text-center"
                 onClick={() => fetchBulkReport(driver)}
               >
-                <FolderOutlined style={{ fontSize: '42px', color: '#1890ff', marginBottom: '12px' }} />
-                <Text strong style={{ fontSize: '14px' }}>{driver.username}</Text>
-                <Text type="secondary" style={{ fontSize: '12px', marginTop: '4px' }}>ID: {driver.id}</Text>
+                <CardContent className="flex flex-col items-center px-2 py-4">
+                  <Folder className="mb-3 h-10 w-10 text-gray-900" />
+                  <p className="text-sm font-semibold">{driver.username}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">ID: {driver.id}</p>
+                </CardContent>
               </Card>
-            </Col>
-          ))}
-        </Row>
-      </Space>
+            ))}
+        </div>
+      </div>
 
-      {/* Bottom Fixed Panel */}
       {panelVisible && (
-        <div style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          background: 'white',
-          borderTop: '2px solid #1890ff',
-          boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.1)',
-          zIndex: 1000,
-          maxHeight: '65vh',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
-          {/* Header */}
-          <div style={{
-            padding: '16px 24px',
-            background: '#1890ff',
-            color: 'white',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <Title level={4} style={{ margin: 0, color: 'white' }}>
+        <div className="fixed bottom-0 left-0 right-0 z-[1000] flex max-h-[65vh] flex-col border-t bg-white shadow-lg">
+          <div className="flex items-center justify-between bg-gray-900 px-6 py-4 text-white">
+            <h4 className="text-lg font-semibold">
               Bulk Report - {selectedDriver?.username} (ID: {selectedDriver?.id})
-            </Title>
-            <Button type="text" icon={<CloseOutlined />} onClick={handleClosePanel} style={{ color: 'white' }} />
+            </h4>
+            <Button variant="ghost" size="sm" className="text-white" onClick={handleClosePanel}>
+              <X className="h-4 w-4" />
+            </Button>
           </div>
 
-          {/* Table */}
-          <div style={{ padding: '16px 24px', flex: 1, overflow: 'auto' }}>
+          <div className="flex-1 overflow-auto px-6 py-4">
             {bulkLoading ? (
-              <div style={{ textAlign: 'center', padding: '20px' }}>
-                <Spin tip="Loading bulk report..." />
-              </div>
+              <p className="py-5 text-center text-muted-foreground">Loading bulk report...</p>
             ) : bulks.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px' }}>
-                <Text type="secondary">No bulk records found.</Text>
-              </div>
+              <p className="py-5 text-center text-muted-foreground">No bulk records found.</p>
             ) : (
-              <Table
-                dataSource={bulks}
-                columns={bulkColumns}
-                rowKey="id"
-                pagination={{ pageSize: 5 }}
-                size="small"
-                scroll={{ x: 1000 }}
-                style={{ marginBottom: '16px' }}
-              />
+              <>
+                <div className="border rounded-md">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Тайлангйин огноо</TableHead>
+                        <TableHead>Тоо</TableHead>
+                        <TableHead>Хүргэгдсэн</TableHead>
+                        <TableHead>Дүн</TableHead>
+                        <TableHead>Зөрүү</TableHead>
+                        <TableHead>Хүргэлтэнд гарса</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paged.map((record) => (
+                        <TableRow key={record.id}>
+                          <TableCell>{record.report_date ? new Date(record.report_date).toISOString().slice(0, 10) : "-"}</TableCell>
+                          <TableCell>{record.count}</TableCell>
+                          <TableCell>{record.deliveredCount}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                className="w-[120px] text-right text-sm"
+                                value={editingAmounts[record.id]}
+                                onChange={(e) => handleAmountChange(record.id, e.target.value)}
+                              />
+                              <Button size="sm" disabled={saving?.id === record.id && saving?.type === "amount"} onClick={() => updateBulkAmount(record.id)}>
+                                <Save className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                className="w-[120px] text-right text-sm"
+                                value={editingDiffs[record.id]}
+                                onChange={(e) => handleDiffChange(record.id, e.target.value)}
+                              />
+                              <Button size="sm" disabled={saving?.id === record.id && saving?.type === "diff"} onClick={() => updateBulkDiff(record.id)}>
+                                <Save className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell>{record.paid}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Өмнөх</Button>
+                  <span className="text-sm">{page} / {pageCount}</span>
+                  <Button variant="outline" size="sm" disabled={page >= pageCount} onClick={() => setPage((p) => p + 1)}>Дараах</Button>
+                </div>
+              </>
             )}
           </div>
 
-          {/* Footer */}
-          <div style={{
-            padding: '12px 24px',
-            borderTop: '1px solid #f0f0f0',
-            background: '#fafafa',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <Text type="secondary">Total Records: {bulks.length}</Text>
-            <Button onClick={handleClosePanel}>Close</Button>
+          <div className="flex items-center justify-between border-t bg-muted/40 px-6 py-3">
+            <span className="text-sm text-muted-foreground">Total Records: {bulks.length}</span>
+            <Button variant="outline" onClick={handleClosePanel}>Close</Button>
           </div>
         </div>
       )}

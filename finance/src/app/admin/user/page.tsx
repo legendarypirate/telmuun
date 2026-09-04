@@ -1,27 +1,37 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { useUsers } from "@/hooks/use-lookups";
+import { queryKeys } from "@/lib/api";
+import { Lock, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
-  Button,
-  Space,
-  Drawer,
-  Form,
-  Input,
-  Select,
-  Modal,
-  App,
-  message,
-} from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
-  EditOutlined,
-  DeleteOutlined,
-  LockOutlined,
-  ExclamationCircleOutlined,
-} from '@ant-design/icons';
-
-const { Option } = Select;
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 interface User {
   id: number;
@@ -33,265 +43,239 @@ interface User {
   updatedAt: string;
 }
 
-export default function UsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [form] = Form.useForm();
-  const { modal } = App.useApp();
-
-  // Change password modal state
-  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [passwordForm] = Form.useForm();
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/user`);
-      const result = await res.json();
-      if (result.success) {
-        setUsers(result.data);
-      } else {
-        console.error('Failed to load users:', result.message);
-      }
-    } catch (err) {
-      console.error('Fetch error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    document.title = 'Хэрэглэгч';
-    fetchData();
-  }, []);
-
-const handleDelete = (record: User) => {
-  const userToDelete = record;
-  // Defer so modal opens after click handling (fixes production)
-  setTimeout(() => {
-    modal.confirm({
-      title: 'Устгахдаа итгэлтэй байна уу?',
-      icon: <ExclamationCircleOutlined />,
-      content: `"${userToDelete.username}" устгах`,
-      okText: 'Тийм',
-      okType: 'danger',
-      cancelText: 'Үгүй',
-      onOk: async () => {
-        try {
-          const res = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/user/${userToDelete.id}`,
-            { method: 'DELETE' }
-          );
-          const json = await res.json();
-
-          if (json.success) {
-            message.success('Амжилттай устгалаа!');
-            fetchData();
-          } else {
-            message.error(json.message || 'Устгахад алдаа гарлаа');
-          }
-        } catch (err) {
-          console.error(err);
-          message.error('Устгахад алдаа гарлаа');
-        }
-      },
-    });
-  }, 0);
+const ROLE_LABELS: Record<number, string> = {
+  1: "admin",
+  2: "customer",
+  3: "driver",
 };
 
+export default function UsersPage() {
+  const queryClient = useQueryClient();
+  const { data: users = [], isFetching: loading } = useUsers();
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [form, setForm] = useState({
+    username: "",
+    email: "",
+    phone: "",
+    role_id: "",
+    password: "",
+  });
+  const [newPassword, setNewPassword] = useState("");
 
-  const handleCreateUser = () => {
-    setDrawerVisible(true);
+  const fetchData = () => queryClient.invalidateQueries({ queryKey: queryKeys.users });
+
+  useEffect(() => {
+    document.title = "Хэрэглэгч";
+  }, []);
+
+  const confirmDelete = async () => {
+    if (!selectedUser) return;
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/user/${selectedUser.id}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+
+      if (json.success) {
+        toast.success("Амжилттай устгалаа!");
+        fetchData();
+      } else {
+        toast.error(json.message || "Устгахад алдаа гарлаа");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Устгахад алдаа гарлаа");
+    }
+    setDeleteOpen(false);
   };
 
   const handleDrawerClose = () => {
     setDrawerVisible(false);
-    form.resetFields();
+    setForm({ username: "", email: "", phone: "", role_id: "", password: "" });
   };
 
   const handleFormSubmit = async () => {
     try {
-      const values = await form.validateFields();
+      const values = {
+        username: form.username,
+        email: form.email,
+        phone: form.phone,
+        role_id: Number(form.role_id),
+        password: form.password,
+      };
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/user`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
       });
       const result = await response.json();
       if (response.ok && result.success) {
-        message.success('Хэрэглэгч амжилттай үүслээ');
+        toast.success("Хэрэглэгч амжилттай үүслээ");
         fetchData();
         handleDrawerClose();
       } else {
-        message.error(result.message || 'Алдаа гарлаа');
+        toast.error(result.message || "Алдаа гарлаа");
       }
     } catch (error) {
       console.error(error);
-      message.error('Хэлбэр буруу байна');
+      toast.error("Хэлбэр буруу байна");
     }
-  };
-
-  const handleChangePassword = (user: User) => {
-    setSelectedUser(user);
-    passwordForm.resetFields();
-    setPasswordModalVisible(true);
   };
 
   const handlePasswordChangeSubmit = async () => {
     try {
-      const values = await passwordForm.validateFields();
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/user/${selectedUser?.id}/password`,
         {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password: values.password }),
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password: newPassword }),
         }
       );
       const result = await response.json();
       if (response.ok && result.success) {
-        message.success('Нууц үг амжилттай шинэчлэгдлээ');
+        toast.success("Нууц үг амжилттай шинэчлэгдлээ");
         setPasswordModalVisible(false);
       } else {
-        message.error(result.message || 'Алдаа гарлаа');
+        toast.error(result.message || "Алдаа гарлаа");
       }
     } catch (error) {
       console.error(error);
-      message.error('Хэлбэр буруу байна');
+      toast.error("Хэлбэр буруу байна");
     }
   };
 
-  const columns: ColumnsType<User> = [
-    {
-      title: 'Username',
-      dataIndex: 'username',
-    },
-    {
-      title: 'Email',
-      dataIndex: 'email',
-    },
-    {
-      title: 'Phone',
-      dataIndex: 'phone',
-    },
-    {
-      title: 'Role',
-      dataIndex: 'role_id',
-      render: (role_id: number) => {
-        const roles: Record<number, string> = {
-          1: 'admin',
-          2: 'customer',
-          3: 'driver',
-        };
-        return roles[role_id] || `Role ${role_id}`;
-      },
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      render: (_, record) => (
-        <Space>
-          <Button
-            type="link"
-            icon={<LockOutlined />}
-            onClick={() => handleChangePassword(record)}
-          >
-            Change Password
-          </Button>
-          <Button
-            type="link"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record)}
-          >
-            Delete
-          </Button>
-        </Space>
-      ),
-    },
-  ];
-
   return (
     <div>
-      <h1 style={{ marginBottom: 24 }}>Хэрэглэгч</h1>
-      <Space style={{ marginBottom: 16, width: '100%' }} wrap>
-        <Button
-          type="primary"
-          style={{ marginLeft: 'auto' }}
-          onClick={handleCreateUser}
-        >
-          + Хэрэглэгч үүсгэх
-        </Button>
-      </Space>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Хэрэглэгч</h1>
+        <Button onClick={() => setDrawerVisible(true)}>+ Хэрэглэгч үүсгэх</Button>
+      </div>
 
-      <Table
-        columns={columns}
-        dataSource={users}
-        rowKey="id"
-        loading={loading}
-      />
+      <div className="border rounded-md">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Username</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Phone</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                  Ачааллаж байна...
+                </TableCell>
+              </TableRow>
+            ) : (
+              users.map((record) => (
+                <TableRow key={record.id}>
+                  <TableCell>{record.username}</TableCell>
+                  <TableCell>{record.email}</TableCell>
+                  <TableCell>{record.phone}</TableCell>
+                  <TableCell>{ROLE_LABELS[record.role_id] || `Role ${record.role_id}`}</TableCell>
+                  <TableCell className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedUser(record);
+                        setNewPassword("");
+                        setPasswordModalVisible(true);
+                      }}
+                    >
+                      <Lock className="h-4 w-4" /> Change Password
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedUser(record);
+                        setDeleteOpen(true);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" /> Delete
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
-      {/* Drawer for creating users */}
-      <Drawer
-        title="Хэрэглэгч үүсгэх"
-        width={400}
-        onClose={handleDrawerClose}
-        open={drawerVisible}
-        bodyStyle={{ paddingBottom: 80 }}
-      >
-        <Form layout="vertical" form={form} onFinish={handleFormSubmit}>
-          <Form.Item name="username" label="Username" rules={[{ required: true }]}>
-            <Input placeholder="Username" />
-          </Form.Item>
-          <Form.Item name="email" label="Email">
-            <Input placeholder="Email" />
-          </Form.Item>
-          <Form.Item name="phone" label="Phone">
-            <Input placeholder="Phone" />
-          </Form.Item>
-          <Form.Item name="role_id" label="Role" rules={[{ required: true }]}>
-            <Select placeholder="Select role">
-              <Option value={1}>Admin</Option>
-              <Option value={2}>Customer</Option>
-              <Option value={3}>Driver</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item
-            name="password"
-            label="Password"
-            rules={[{ required: true, message: 'Please enter a password' }]}
-          >
-            <Input.Password placeholder="Password" />
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" htmlType="submit" block>
-              Хадгалах
-            </Button>
-          </Form.Item>
-        </Form>
-      </Drawer>
+      <Sheet open={drawerVisible} onOpenChange={(open) => (open ? setDrawerVisible(true) : handleDrawerClose())}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Хэрэглэгч үүсгэх</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4 space-y-3">
+            <div className="space-y-2">
+              <Label>Username</Label>
+              <Input placeholder="Username" value={form.username} onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input placeholder="Email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Phone</Label>
+              <Input placeholder="Phone" value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Select value={form.role_id} onValueChange={(v) => setForm((p) => ({ ...p, role_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Admin</SelectItem>
+                  <SelectItem value="2">Customer</SelectItem>
+                  <SelectItem value="3">Driver</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Password</Label>
+              <Input type="password" placeholder="Password" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
+            </div>
+            <Button className="w-full" onClick={handleFormSubmit}>Хадгалах</Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
-      {/* Modal for changing password */}
-      <Modal
-        title={`Нууц үг шинэчлэх: ${selectedUser?.username}`}
-        open={passwordModalVisible}
-        onCancel={() => setPasswordModalVisible(false)}
-        onOk={handlePasswordChangeSubmit}
-        okText="Шинэчлэх"
-        cancelText="Цуцлах"
-      >
-        <Form form={passwordForm} layout="vertical">
-          <Form.Item
-            name="password"
-            label="Шинэ нууц үг"
-            rules={[{ required: true, message: 'Нууц үг оруулна уу' }]}
-          >
-            <Input.Password />
-          </Form.Item>
-        </Form>
-      </Modal>
+      <Dialog open={passwordModalVisible} onOpenChange={setPasswordModalVisible}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Нууц үг шинэчлэх: {selectedUser?.username}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Шинэ нууц үг</Label>
+            <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPasswordModalVisible(false)}>Цуцлах</Button>
+            <Button onClick={handlePasswordChangeSubmit}>Шинэчлэх</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Устгахдаа итгэлтэй байна уу?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">&quot;{selectedUser?.username}&quot; устгах</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Үгүй</Button>
+            <Button variant="destructive" onClick={confirmDelete}>Тийм</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
