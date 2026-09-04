@@ -71,6 +71,19 @@ interface DeliveryStatus {
   color: string;
 }
 
+function statusChipStyle(status?: string, color?: string | null) {
+  const name = (status || "").toLowerCase();
+  const bg = (color || "").toLowerCase();
+  const isNew = name === "шинэ" || bg === "yellow" || bg === "#ffff00" || bg === "#ff0";
+  if (isNew) {
+    return { backgroundColor: "orange", color: "#111" };
+  }
+  return {
+    backgroundColor: color || "#999",
+    color: "#fff",
+  };
+}
+
 export default function DeliveryPage() {
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([]);
   const [merchantFilter, setMerchantFilter] = useState<string>("all");
@@ -440,7 +453,7 @@ export default function DeliveryPage() {
             key={status.id}
             onClick={() => toggleStatus(status.id)}
             className={`rounded-md border px-3 py-1 text-sm ${selectedStatuses.includes(status.id) ? "border-green-600 ring-2 ring-green-200" : "border-border"}`}
-            style={{ background: status.color || undefined, color: status.color ? "#fff" : undefined }}
+            style={statusChipStyle(status.status, status.color)}
           >
             {status.status}
           </button>
@@ -482,7 +495,7 @@ export default function DeliveryPage() {
               <TableHead>Үүссэн огноо</TableHead>
               <TableHead>Хүргэсэн огноо</TableHead>
               {!isMerchant && <TableHead>Дэлгүүр</TableHead>}
-              <TableHead>Хаяг / Утас</TableHead>
+              <TableHead className="min-w-[180px] max-w-[280px] whitespace-normal">Хаяг / Утас</TableHead>
               <TableHead>Төлөв</TableHead>
               <TableHead>Үнэ</TableHead>
               <TableHead>Тайлбар</TableHead>
@@ -503,14 +516,16 @@ export default function DeliveryPage() {
                   <TableCell className="text-xs">{dayjs(record.createdAt).format("YYYY-MM-DD HH:mm")}</TableCell>
                   <TableCell className="text-xs">{record.delivered_at ? dayjs(record.delivered_at).format("YYYY-MM-DD HH:mm") : "-"}</TableCell>
                   {!isMerchant && <TableCell>{record.merchant?.username || "-"}</TableCell>}
-                  <TableCell>
-                    <button className="text-left" onClick={() => handleExpand(record.id)}>
-                      <div className="font-medium">{record.phone}</div>
-                      <div className="text-xs text-muted-foreground">{record.address}</div>
+                  <TableCell className="max-w-[280px] whitespace-normal align-top">
+                    <button className="text-left w-full" onClick={() => handleExpand(record.id)}>
+                      <div className="font-medium break-words">{record.phone}</div>
+                      <div className="text-xs text-muted-foreground whitespace-normal break-words">
+                        {record.address}
+                      </div>
                     </button>
                   </TableCell>
                   <TableCell>
-                    <Badge style={{ backgroundColor: record.status_name?.color || "#999", color: "#fff" }}>
+                    <Badge style={statusChipStyle(record.status_name?.status, record.status_name?.color)}>
                       {record.status_name?.status || record.status}
                       {(record.status === 10 || record.status === "10") && record.postponed_number ? ` (${record.postponed_number})` : ""}
                     </Badge>
