@@ -690,8 +690,8 @@ export default function DeliveryPage() {
               <React.Fragment key={record.id}>
                 <TableRow>
                   <TableCell><Checkbox checked={selectedRowKeys.includes(record.id)} onCheckedChange={() => toggleRow(record.id)} /></TableCell>
-                  <TableCell className="text-xs">{dayjs(record.createdAt).format("YYYY-MM-DD HH:mm")}</TableCell>
-                  <TableCell className="text-xs">
+                  <TableCell>{dayjs(record.createdAt).format("YYYY-MM-DD HH:mm")}</TableCell>
+                  <TableCell>
                     {record.delivery_date
                       ? dayjs(record.delivery_date).format("YYYY-MM-DD")
                       : dayjs(record.createdAt).format("YYYY-MM-DD")}
@@ -700,8 +700,8 @@ export default function DeliveryPage() {
                   <TableCell>{districtName(record.district_id)}</TableCell>
                   <TableCell className="max-w-[280px] whitespace-normal align-top">
                     <button className="text-left w-full" onClick={() => handleExpand(record.id)}>
-                      <div className="font-medium break-words">{record.phone}</div>
-                      <div className="text-xs text-muted-foreground whitespace-normal break-words">
+                      <div className="break-words">{record.phone}</div>
+                      <div className="whitespace-normal break-words">
                         {record.address}
                       </div>
                     </button>
