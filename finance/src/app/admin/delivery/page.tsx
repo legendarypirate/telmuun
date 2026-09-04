@@ -40,6 +40,21 @@ import { queryKeys } from "@/lib/api";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
+const DISTRICTS = [
+  { id: 1, name: "Баянзүрх" },
+  { id: 2, name: "Сүхбаатар" },
+  { id: 3, name: "Хан Уул" },
+  { id: 4, name: "Баянгол" },
+  { id: 5, name: "Чингэлтэй" },
+  { id: 6, name: "Сонгинохайрхан" },
+  { id: 7, name: "Ороннутаг" },
+] as const;
+
+function districtName(id?: number | null) {
+  if (id == null) return "-";
+  return DISTRICTS.find((d) => d.id === Number(id))?.name || "-";
+}
+
 interface Item {
   id: number;
   good_id: number;
@@ -63,6 +78,7 @@ interface Delivery {
   postponed_number?: number;
   items?: Item[];
   image?: string;
+  district_id?: number | null;
 }
 
 interface DeliveryStatus {
@@ -88,6 +104,7 @@ export default function DeliveryPage() {
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([]);
   const [merchantFilter, setMerchantFilter] = useState<string>("all");
   const [driverFilter, setDriverFilter] = useState<string>("all");
+  const [districtFilter, setDistrictFilter] = useState<string>("all");
   const [phoneFilter, setPhoneFilter] = useState("");
   const [debouncedPhone, setDebouncedPhone] = useState("");
   const [startDate, setStartDate] = useState(formatDateLocal(new Date()));
@@ -120,8 +137,9 @@ export default function DeliveryPage() {
     address: "",
     price: "",
     comment: "",
+    districtId: "",
   });
-  const [editForm, setEditForm] = useState({ phone: "", address: "", price: "" });
+  const [editForm, setEditForm] = useState({ phone: "", address: "", price: "", districtId: "" });
   const [pullFromWarehouse, setPullFromWarehouse] = useState(false);
   const [products, setProducts] = useState<{ id: string; name: string }[]>([]);
   const [productList, setProductList] = useState<
@@ -174,6 +192,7 @@ export default function DeliveryPage() {
     selectedStatuses,
     startDate,
     endDate,
+    districtFilter,
     refreshKey,
   };
 
@@ -189,6 +208,7 @@ export default function DeliveryPage() {
       if (driverFilter !== "all") url += `&driver_id=${driverFilter}`;
       if (selectedStatuses.length) url += `&status_ids=${selectedStatuses.join(",")}`;
       if (startDate && endDate) url += `&start_date=${startDate}&end_date=${endDate}`;
+      if (districtFilter !== "all") url += `&district_id=${districtFilter}`;
       const res = await fetch(url);
       const result = await res.json();
       if (!result.success) throw new Error(result.message || "Хүргэлт ачааллахад алдаа гарлаа");
@@ -377,8 +397,8 @@ export default function DeliveryPage() {
       toast.error("Токен олдсонгүй. Та дахин нэвтэрнэ үү.");
       return;
     }
-    if (!createForm.phone || !createForm.address || (!isMerchant && !createForm.merchantId)) {
-      toast.error("Формыг шалгана уу.");
+    if (!createForm.phone || !createForm.address || !createForm.districtId || (!isMerchant && !createForm.merchantId)) {
+      toast.error("Формыг шалгана уу. Дүүрэг сонгоно уу.");
       return;
     }
     const payload = {
@@ -388,6 +408,7 @@ export default function DeliveryPage() {
       status: 1,
       price: createForm.price ? Number(createForm.price) : 0,
       comment: createForm.comment || "",
+      district_id: Number(createForm.districtId),
       items: productList.map((item) => ({ good_id: item.productId, quantity: item.quantity })),
     };
     const res = await fetch(`${API}/api/delivery`, {
@@ -399,7 +420,7 @@ export default function DeliveryPage() {
     if (result.success) {
       toast.success("Амжилттай бүртгэгдлээ");
       setIsDrawerOpen(false);
-      setCreateForm({ merchantId: "", phone: "", address: "", price: "", comment: "" });
+      setCreateForm({ merchantId: "", phone: "", address: "", price: "", comment: "", districtId: "" });
       setProductList([]);
       setRefreshKey((k) => k + 1);
     } else {
@@ -416,6 +437,7 @@ export default function DeliveryPage() {
         phone: editForm.phone,
         address: editForm.address,
         price: Number(editForm.price) || 0,
+        district_id: editForm.districtId ? Number(editForm.districtId) : null,
       }),
     });
     const result = await res.json();
@@ -546,15 +568,15 @@ export default function DeliveryPage() {
   const pageCount = Math.max(1, Math.ceil(pagination.total / pagination.pageSize));
 
   return (
-    <div className="pb-28">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="px-6 pt-6 pb-32">
+      <div className="mb-8 flex items-center justify-between">
         <h1 className="text-3xl font-bold">Хүргэлт</h1>
         <Button onClick={() => setIsDrawerOpen(true)}>
           <Plus className="h-4 w-4" /> Хүргэлт нэмэх
         </Button>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="mb-6 rounded-lg border bg-card p-4 flex flex-wrap items-center gap-3">
         <Input
           placeholder="Утас"
           value={phoneFilter}
@@ -563,11 +585,20 @@ export default function DeliveryPage() {
         />
         <Input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPagination((p) => ({ ...p, current: 1 })); }} className="w-40" />
         <Input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPagination((p) => ({ ...p, current: 1 })); }} className="w-40" />
+        <Select value={districtFilter} onValueChange={(v) => { setDistrictFilter(v); setPagination((p) => ({ ...p, current: 1 })); }}>
+          <SelectTrigger className="w-48"><SelectValue placeholder="Дүүрэг" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Бүх дүүрэг</SelectItem>
+            {DISTRICTS.map((d) => (
+              <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {statusList.map((status) => (
           <button
             key={status.id}
             onClick={() => toggleStatus(status.id)}
-            className={`rounded-md border px-3 py-1 text-sm ${selectedStatuses.includes(status.id) ? "border-green-600 ring-2 ring-green-200" : "border-border"}`}
+            className={`rounded-md border px-3 py-1.5 text-sm ${selectedStatuses.includes(status.id) ? "border-green-600 ring-2 ring-green-200" : "border-border"}`}
             style={statusChipStyle(status.status, status.color)}
           >
             {status.status}
@@ -602,14 +633,15 @@ export default function DeliveryPage() {
         )}
       </div>
 
-      <div className="border rounded-md overflow-x-auto">
-        <Table>
+      <div className="border rounded-lg overflow-x-auto">
+        <Table className="[&_th]:px-3 [&_th]:py-3 [&_td]:px-3 [&_td]:py-3">
           <TableHeader>
             <TableRow>
               <TableHead className="w-10"><Checkbox checked={deliveryData.length > 0 && selectedRowKeys.length === deliveryData.length} onCheckedChange={toggleAll} /></TableHead>
               <TableHead>Үүссэн огноо</TableHead>
               <TableHead>Хүргэсэн огноо</TableHead>
               {!isMerchant && <TableHead>Дэлгүүр</TableHead>}
+              <TableHead>Дүүрэг</TableHead>
               <TableHead className="min-w-[180px] max-w-[280px] whitespace-normal">Хаяг / Утас</TableHead>
               <TableHead>Төлөв</TableHead>
               <TableHead>Үнэ</TableHead>
@@ -621,9 +653,9 @@ export default function DeliveryPage() {
           </TableHeader>
           <TableBody>
             {tableLoading ? (
-              <TableRow><TableCell colSpan={11} className="py-10 text-center text-muted-foreground">Ачааллаж байна...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={12} className="py-10 text-center text-muted-foreground">Ачааллаж байна...</TableCell></TableRow>
             ) : deliveryData.length === 0 ? (
-              <TableRow><TableCell colSpan={11} className="py-10 text-center text-muted-foreground">Хүргэлт олдсонгүй</TableCell></TableRow>
+              <TableRow><TableCell colSpan={12} className="py-10 text-center text-muted-foreground">Хүргэлт олдсонгүй</TableCell></TableRow>
             ) : deliveryData.map((record) => (
               <React.Fragment key={record.id}>
                 <TableRow>
@@ -631,6 +663,7 @@ export default function DeliveryPage() {
                   <TableCell className="text-xs">{dayjs(record.createdAt).format("YYYY-MM-DD HH:mm")}</TableCell>
                   <TableCell className="text-xs">{record.delivered_at ? dayjs(record.delivered_at).format("YYYY-MM-DD HH:mm") : "-"}</TableCell>
                   {!isMerchant && <TableCell>{record.merchant?.username || "-"}</TableCell>}
+                  <TableCell>{districtName(record.district_id)}</TableCell>
                   <TableCell className="max-w-[280px] whitespace-normal align-top">
                     <button className="text-left w-full" onClick={() => handleExpand(record.id)}>
                       <div className="font-medium break-words">{record.phone}</div>
@@ -658,7 +691,12 @@ export default function DeliveryPage() {
                       <div className="flex gap-1">
                         <Button variant="ghost" size="sm" onClick={() => {
                           setSelectedDelivery(record);
-                          setEditForm({ phone: record.phone, address: record.address, price: String(record.price ?? "") });
+                          setEditForm({
+                            phone: record.phone,
+                            address: record.address,
+                            price: String(record.price ?? ""),
+                            districtId: record.district_id ? String(record.district_id) : "",
+                          });
                           setIsEditOpen(true);
                         }}><Edit className="h-4 w-4" /></Button>
                         {record.image && (
@@ -672,7 +710,7 @@ export default function DeliveryPage() {
                 </TableRow>
                 {expandedId === record.id && (
                   <TableRow>
-                    <TableCell colSpan={11} className="bg-muted/30">
+                    <TableCell colSpan={12} className="bg-muted/40 px-6 py-4">
                       {(expandedItems[record.id] || []).length === 0 ? (
                         <p className="text-sm text-muted-foreground">Бараа олдсонгүй</p>
                       ) : (
@@ -725,6 +763,7 @@ export default function DeliveryPage() {
                 const excelData = selectedRows.map((row) => ({
                   ID: row.id,
                   Дэлгүүр: row.merchant?.username ?? "-",
+                  Дүүрэг: districtName(row.district_id),
                   Хаяг: row.address,
                   Утас: row.phone,
                   Үнэ: Number(row.price) || 0,
@@ -742,9 +781,9 @@ export default function DeliveryPage() {
       )}
 
       <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-        <SheetContent className="overflow-y-auto sm:max-w-md">
-          <SheetHeader><SheetTitle>Хүргэлт үүсгэх</SheetTitle></SheetHeader>
-          <div className="space-y-4 mt-4">
+        <SheetContent className="overflow-y-auto sm:max-w-md px-6">
+          <SheetHeader className="px-0 pb-4"><SheetTitle>Хүргэлт үүсгэх</SheetTitle></SheetHeader>
+          <div className="space-y-5 mt-2">
             {!isMerchant && (
               <div className="space-y-2">
                 <Label>Дэлгүүр</Label>
@@ -757,6 +796,17 @@ export default function DeliveryPage() {
               </div>
             )}
             <div className="space-y-2"><Label>Утас</Label><Input value={createForm.phone} onChange={(e) => setCreateForm((p) => ({ ...p, phone: e.target.value }))} /></div>
+            <div className="space-y-2">
+              <Label>Дүүрэг</Label>
+              <Select value={createForm.districtId} onValueChange={(v) => setCreateForm((p) => ({ ...p, districtId: v }))}>
+                <SelectTrigger><SelectValue placeholder="Дүүрэг сонгох" /></SelectTrigger>
+                <SelectContent>
+                  {DISTRICTS.map((d) => (
+                    <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2"><Label>Хаяг</Label><Input value={createForm.address} onChange={(e) => setCreateForm((p) => ({ ...p, address: e.target.value }))} /></div>
             <div className="space-y-2"><Label>Үнэ</Label><Input type="number" value={createForm.price} onChange={(e) => setCreateForm((p) => ({ ...p, price: e.target.value }))} /></div>
             <div className="space-y-2"><Label>Тайлбар</Label><Input value={createForm.comment} onChange={(e) => setCreateForm((p) => ({ ...p, comment: e.target.value }))} /></div>
@@ -800,8 +850,19 @@ export default function DeliveryPage() {
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Хүргэлт засах</DialogTitle></DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-4 py-2">
             <div className="space-y-2"><Label>Утас</Label><Input value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} /></div>
+            <div className="space-y-2">
+              <Label>Дүүрэг</Label>
+              <Select value={editForm.districtId} onValueChange={(v) => setEditForm((p) => ({ ...p, districtId: v }))}>
+                <SelectTrigger><SelectValue placeholder="Дүүрэг сонгох" /></SelectTrigger>
+                <SelectContent>
+                  {DISTRICTS.map((d) => (
+                    <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2"><Label>Хаяг</Label><Input value={editForm.address} onChange={(e) => setEditForm((p) => ({ ...p, address: e.target.value }))} /></div>
             <div className="space-y-2"><Label>Үнэ</Label><Input type="number" value={editForm.price} onChange={(e) => setEditForm((p) => ({ ...p, price: e.target.value }))} /></div>
           </div>

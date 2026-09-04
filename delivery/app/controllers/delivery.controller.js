@@ -412,6 +412,7 @@ exports.create = async (req, res) => {
       price,
       comment,
       scheduled_delivery_date: scheduledDate, // <-- EXACT logic implemented
+      district_id: req.body.district_id ? Number(req.body.district_id) : null,
     };
 
     const delivery = await Delivery.create(newDel, { transaction: t });
@@ -636,7 +637,7 @@ exports.findAll = async (req, res) => {
     const offset = (page - 1) * limit;
 
     // Query params
-    const { merchant_id, status_ids, driver_id, phone, start_date, end_date } = req.query;
+    const { merchant_id, status_ids, driver_id, phone, start_date, end_date, district_id } = req.query;
     const statusIds = status_ids ? status_ids.split(',').map(Number) : [];
 
     // Base WHERE
@@ -648,6 +649,7 @@ exports.findAll = async (req, res) => {
     if (driver_id) where.driver_id = driver_id;
     if (phone) where.phone = { [Op.like]: `%${phone}%` };
     if (statusIds.length > 0) where.status = { [Op.in]: statusIds };
+    if (district_id) where.district_id = Number(district_id);
 
     // --- Date Filtering (createdAt) ---
     let filterStart, filterEnd;
@@ -907,7 +909,7 @@ exports.update = (req, res) => {
   const id = req.params.id;
 
   // Validate request (ensure at least one field is provided)
-  if (!req.body.phone && !req.body.address && req.body.price === undefined) {
+  if (!req.body.phone && !req.body.address && req.body.price === undefined && req.body.district_id === undefined) {
     return res.status(400).json({
       success: false,
       message: "Request body cannot be empty. At least phone, address, or price is required.",
@@ -921,6 +923,9 @@ exports.update = (req, res) => {
   if (req.body.phone !== undefined) updateData.phone = req.body.phone;
   if (req.body.address !== undefined) updateData.address = req.body.address;
   if (req.body.price !== undefined) updateData.price = req.body.price;
+  if (req.body.district_id !== undefined) {
+    updateData.district_id = req.body.district_id ? Number(req.body.district_id) : null;
+  }
 
   // Update the delivery entry in the database
   Delivery.update(updateData, { where: { id: id } })

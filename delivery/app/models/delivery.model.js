@@ -87,7 +87,12 @@ postponed_number: {
       type: Sequelize.DATEONLY,
       allowNull: true, // Changed from false to true
       defaultValue: null // Changed from Sequelize.NOW
-    }
+    },
+    district_id: {
+      type: Sequelize.INTEGER,
+      allowNull: true,
+      defaultValue: null,
+    },
   }, {
     // REMOVE the hooks section completely or modify it
     // Only set scheduled_delivery_date when NOT provided

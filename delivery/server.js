@@ -39,6 +39,9 @@ db.sequelize.sync()
       await db.sequelize.query(
         "ALTER TABLE goods ADD COLUMN IF NOT EXISTS delivered INTEGER DEFAULT 0"
       );
+      await db.sequelize.query(
+        "ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS district_id INTEGER DEFAULT NULL"
+      );
     } catch (err) {
       console.log("column check:", err.message);
     }
