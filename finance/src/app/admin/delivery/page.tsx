@@ -281,9 +281,10 @@ export default function DeliveryPage() {
             <style>
               body { font-family: Arial, sans-serif; margin: 0; padding: 20px; font-size: 18px; }
               .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; font-size: 20px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 16px; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 16px; table-layout: fixed; }
               th, td { border: 1px solid #ccc; padding: 10px 12px; text-align: left; word-break: break-word; }
               th { background-color: #f5f5f5; font-weight: bold; font-size: 18px; }
+              .addr { width: 28%; max-width: 28%; }
               @page { size: A4 portrait; margin: 10mm; }
             </style>
           </head>
@@ -300,7 +301,7 @@ export default function DeliveryPage() {
                   <th>Тоо</th>
                   <th>Нийт үнэ</th>
                   <th>Утас</th>
-                  <th>Дэлгэрэнгүй хаяг</th>
+                  <th class="addr">Дэлгэрэнгүй хаяг</th>
                 </tr>
               </thead>
               <tbody>
@@ -317,7 +318,7 @@ export default function DeliveryPage() {
                           <td>-</td>
                           <td>${Number(row.price || 0).toLocaleString()}₮</td>
                           <td>${row.phone}</td>
-                          <td>${row.address}</td>
+                          <td class="addr">${row.address}</td>
                         </tr>
                       `;
                     }
@@ -334,7 +335,7 @@ export default function DeliveryPage() {
                           ${index === 0 ? `
                             <td rowspan="${items.length}">${Number(row.price || 0).toLocaleString()}₮</td>
                             <td rowspan="${items.length}">${row.phone}</td>
-                            <td rowspan="${items.length}">${row.address}</td>
+                            <td class="addr" rowspan="${items.length}">${row.address}</td>
                           ` : ""}
                         </tr>
                       `

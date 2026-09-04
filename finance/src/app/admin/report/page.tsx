@@ -46,6 +46,22 @@ interface MerchantUser {
   email?: string;
 }
 
+function countRangeDays(start: Date, end: Date): number {
+  return Math.max(1, dayjs(end).startOf('day').diff(dayjs(start).startOf('day'), 'day') + 1);
+}
+
+function countWorkedDays(deliveries: Delivery[], startDate: string, endDate: string): number {
+  const days = new Set<string>();
+  deliveries.forEach((delivery) => {
+    if (Number(delivery.status) !== 3) return;
+    const raw = delivery.delivered_at || delivery.createdAt;
+    if (!raw) return;
+    const day = dayjs(raw).format('YYYY-MM-DD');
+    if (day >= startDate && day <= endDate) days.add(day);
+  });
+  return days.size;
+}
+
 export default function ReportPage() {
   // State
   const queryClient = useQueryClient();
@@ -73,6 +89,8 @@ export default function ReportPage() {
   const [reportType, setReportType] = useState<ReportType>('driver');
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const isMerchantReportView = !isCustomer && reportType !== 'driver';
+  const isDriverReport = !isCustomer && reportType === 'driver';
+  const rangeDays = countRangeDays(dateRange[0], dateRange[1]);
 
   const { data: drivers = [] } = useDrivers();
   const { data: merchants = [] } = useMerchants();
@@ -374,7 +392,8 @@ export default function ReportPage() {
             status5Deliveries: status5Count,
             status5MerchantAmount: 0, // Keep for backward compatibility but not used
             status5DriverAmount: 0, // Keep for backward compatibility but not used
-            orderCount, // захиалгын тоо
+            orderCount,
+            workedDays: countWorkedDays(groupDeliveries, startDate, endDate),
           };
         }
       );
@@ -423,7 +442,8 @@ export default function ReportPage() {
             status5Deliveries: status5Count,
             status5MerchantAmount: 0, // Keep for backward compatibility but not used
             status5DriverAmount: 0, // Keep for backward compatibility but not used
-            orderCount, // захиалгын тоо
+            orderCount,
+            workedDays: 0,
           });
         }
       });
@@ -456,7 +476,8 @@ export default function ReportPage() {
             status5Deliveries: 0,
             status5MerchantAmount: 0,
             status5DriverAmount: 0,
-            orderCount, // захиалгын тоо
+            orderCount,
+            workedDays: 0,
           });
         }
       });
@@ -629,6 +650,7 @@ export default function ReportPage() {
       acc.difference += row.totalPrice - row.salary;
       acc.status5Deliveries += row.status5Deliveries;
       acc.orderCount += row.orderCount || 0;
+      acc.workedDays += row.workedDays || 0;
       return acc;
     },
     {
@@ -639,6 +661,7 @@ export default function ReportPage() {
       difference: 0,
       status5Deliveries: 0,
       orderCount: 0,
+      workedDays: 0,
     }
   );
 
@@ -656,7 +679,12 @@ export default function ReportPage() {
     if (!isCustomer) {
       headers.push(typeToUse === 'driver' ? 'Жолооч' : 'Дэлгүүр');
     }
-    headers.push('Нийт хүргэлт', 'Хүргэсэн хүргэлт', 'Хаягаар очсон', 'Захиалгын тоо', 'Нийт тооцоо', 'Тооцоо', 'зөрүү');
+    headers.push('Нийт хүргэлт', 'Хүргэсэн хүргэлт', 'Хаягаар очсон', 'Захиалгын тоо', 'Нийт тооцоо');
+    if (typeToUse === 'driver') {
+      headers.push('Ажилласан өдөр');
+    } else {
+      headers.push('Тооцоо', 'зөрүү');
+    }
 
     const excelData = [
       // Headers
@@ -672,10 +700,13 @@ export default function ReportPage() {
           row.deliveredDeliveries,
           row.status5Deliveries,
           row.orderCount || 0,
-          row.totalPrice,
-          row.salary,
-          row.totalPrice - row.salary
+          row.totalPrice
         );
+        if (typeToUse === 'driver') {
+          rowData.push(row.workedDays || 0);
+        } else {
+          rowData.push(row.salary, row.totalPrice - row.salary);
+        }
         return rowData;
       }),
       // Totals row
@@ -689,10 +720,13 @@ export default function ReportPage() {
           totals.deliveredDeliveries,
           totals.status5Deliveries,
           totals.orderCount,
-          totals.totalPrice,
-          totals.salary,
-          totals.difference
+          totals.totalPrice
         );
+        if (typeToUse === 'driver') {
+          totalsRow.push(totals.workedDays);
+        } else {
+          totalsRow.push(totals.salary, totals.difference);
+        }
         return totalsRow;
       })(),
     ];
@@ -712,8 +746,9 @@ export default function ReportPage() {
       { wch: 18 }, // Хаягаар очсон
       { wch: 18 }, // Захиалгын тоо
       { wch: 15 }, // Нийт тооцоо
-      { wch: 15 }, // Тооцоо
-      { wch: 15 }  // зөрүү
+      ...(typeToUse === 'driver'
+        ? [{ wch: 16 }]
+        : [{ wch: 15 }, { wch: 15 }])
     );
     ws['!cols'] = columnWidths;
 
@@ -733,6 +768,13 @@ export default function ReportPage() {
     <div className="w-full mt-6 px-4 pb-32">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Report</h1>
+        {isDriverReport && (
+          <p className="mt-2 text-sm text-gray-600">
+            Сонгосон хугацаа: <span className="font-semibold">{rangeDays} өдөр</span>
+            {' · '}
+            Ажилласан өдөр = Хүргэсэн дарсан өдөр
+          </p>
+        )}
       </div>
 
       {/* Filters Row */}
@@ -880,15 +922,21 @@ export default function ReportPage() {
               <TableHead>Хаягаар очсон</TableHead>
               <TableHead>Захиалгын тоо</TableHead>
               <TableHead>Нийт тооцоо</TableHead>
-              <TableHead>Тооцоо</TableHead>
-              <TableHead>зөрүү</TableHead>
+              {isDriverReport ? (
+                <TableHead>Ажилласан өдөр</TableHead>
+              ) : (
+                <>
+                  <TableHead>Тооцоо</TableHead>
+                  <TableHead>зөрүү</TableHead>
+                </>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={isCustomer ? 8 : isMerchantReportView ? 11 : 9}
+                  colSpan={isCustomer ? 8 : isMerchantReportView ? 11 : 8}
                   className="text-center py-8"
                 >
                   Loading...
@@ -897,7 +945,7 @@ export default function ReportPage() {
             ) : reportData.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={isCustomer ? 8 : isMerchantReportView ? 11 : 9}
+                  colSpan={isCustomer ? 8 : isMerchantReportView ? 11 : 8}
                   className="text-center py-8 text-gray-500"
                 >
                   No data available for the selected filters
@@ -937,12 +985,20 @@ export default function ReportPage() {
                     <TableCell>{row.status5Deliveries}</TableCell>
                     <TableCell>{row.orderCount || 0}</TableCell>
                     <TableCell>{formatCurrency(row.totalPrice)} ₮</TableCell>
-                    <TableCell className="font-semibold">
-                      {formatCurrency(row.salary)} ₮
-                    </TableCell>
-                    <TableCell className="font-semibold">
-                      {formatCurrency(row.totalPrice - row.salary)} ₮
-                    </TableCell>
+                    {isDriverReport ? (
+                      <TableCell className="font-semibold">
+                        {row.workedDays || 0} / {rangeDays}
+                      </TableCell>
+                    ) : (
+                      <>
+                        <TableCell className="font-semibold">
+                          {formatCurrency(row.salary)} ₮
+                        </TableCell>
+                        <TableCell className="font-semibold">
+                          {formatCurrency(row.totalPrice - row.salary)} ₮
+                        </TableCell>
+                      </>
+                    )}
                   </TableRow>
                 ))}
                 {/* Totals Row */}
@@ -958,12 +1014,18 @@ export default function ReportPage() {
                   <TableCell className="font-bold">
                     {formatCurrency(totals.totalPrice)} ₮
                   </TableCell>
-                  <TableCell className="font-bold">
-                    {formatCurrency(totals.salary)} ₮
-                  </TableCell>
-                  <TableCell className="font-bold">
-                    {formatCurrency(totals.difference)} ₮
-                  </TableCell>
+                  {isDriverReport ? (
+                    <TableCell className="font-bold">{totals.workedDays}</TableCell>
+                  ) : (
+                    <>
+                      <TableCell className="font-bold">
+                        {formatCurrency(totals.salary)} ₮
+                      </TableCell>
+                      <TableCell className="font-bold">
+                        {formatCurrency(totals.difference)} ₮
+                      </TableCell>
+                    </>
+                  )}
                 </TableRow>
               </>
             )}

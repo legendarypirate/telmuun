@@ -15,6 +15,7 @@ export interface ReportRow {
   status5DriverAmount: number; // 5k per delivery for driver
   // Orders with status 3 (захиалгын тоо)
   orderCount: number;
+  workedDays?: number;
 }
 
 export interface MerchantReportEmailDelivery {
