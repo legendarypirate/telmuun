@@ -12,7 +12,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/admin/report/product": "Барааны тайлан",
   "/admin/report/driver": "Жолоочийн тайлан",
   "/admin/log": "Үйлдлийн лог",
-  "/admin/user": "Харилцагч нар",
+  "/admin/user": "Харилцагчийн жагсаалт",
   "/admin/user-driver": "Жолооч",
   "/admin/status": "Хүргэлтийн төлөвүүд",
   "/admin/role": "Эрхийн зохицуулалт",

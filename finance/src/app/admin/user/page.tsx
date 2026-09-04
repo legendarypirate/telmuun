@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUsers } from "@/hooks/use-lookups";
-import { queryKeys } from "@/lib/api";
+import { getAuthHeaders, queryKeys } from "@/lib/api";
 import { Lock, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,18 +57,26 @@ export default function UsersPage() {
 
   const customers = useMemo(
     () =>
-      (users as User[]).filter(
-        (user) =>
-          user.role_id === 2 &&
-          (user.username || "").toLowerCase().includes(searchText.toLowerCase())
-      ),
+      (users as User[]).filter((user) => {
+        if (user.role_id !== 2) return false;
+        const q = searchText.toLowerCase().trim();
+        if (!q) return true;
+        return (
+          (user.username || "").toLowerCase().includes(q) ||
+          (user.email || "").toLowerCase().includes(q) ||
+          (user.phone || "").toLowerCase().includes(q)
+        );
+      }),
     [users, searchText]
   );
 
-  const fetchData = () => queryClient.invalidateQueries({ queryKey: queryKeys.users });
+  const fetchData = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.users });
+    queryClient.invalidateQueries({ queryKey: queryKeys.merchants });
+  };
 
   useEffect(() => {
-    document.title = "Харилцагч нар";
+    document.title = "Харилцагчийн жагсаалт";
   }, []);
 
   const openCreate = () => {
@@ -100,10 +108,10 @@ export default function UsersPage() {
       if (editingUser) {
         const response = await fetch(`${API}/api/user/${editingUser.id}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             username: form.username,
-            email: form.email,
+            email: form.email.trim(),
             phone: form.phone,
             report_price: Number(form.report_price) || 7000,
           }),
@@ -121,10 +129,10 @@ export default function UsersPage() {
 
       const response = await fetch(`${API}/api/user`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           username: form.username,
-          email: form.email,
+          email: form.email.trim(),
           phone: form.phone,
           role_id: 2,
           password: form.password,
@@ -186,17 +194,17 @@ export default function UsersPage() {
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Харилцагч нар</h1>
+        <h1 className="text-3xl font-bold">Харилцагчийн жагсаалт</h1>
         <Button onClick={openCreate}>+ Харилцагч үүсгэх</Button>
       </div>
 
       <div className="mb-4 flex items-center gap-4">
         <div className="text-sm text-muted-foreground">Нийт: {customers.length}</div>
         <Input
-          placeholder="Нэрээр хайх..."
+          placeholder="Нэр, имэйл, утсаар хайх..."
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
-          className="w-64"
+          className="w-72"
         />
       </div>
 
@@ -228,11 +236,17 @@ export default function UsersPage() {
               customers.map((record) => (
                 <TableRow key={record.id}>
                   <TableCell>{record.username}</TableCell>
-                  <TableCell>{record.email}</TableCell>
+                  <TableCell>
+                    {record.email?.trim() ? (
+                      record.email
+                    ) : (
+                      <span className="text-muted-foreground">Имэйл байхгүй</span>
+                    )}
+                  </TableCell>
                   <TableCell>{record.phone}</TableCell>
                   <TableCell>{Number(record.report_price || 7000).toLocaleString()} ₮</TableCell>
                   <TableCell className="flex gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => openEdit(record)}>
+                    <Button variant="ghost" size="sm" onClick={() => openEdit(record)} title="Засах">
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button
@@ -276,7 +290,12 @@ export default function UsersPage() {
             </div>
             <div className="space-y-2">
               <Label>Имэйл</Label>
-              <Input value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
+              <Input
+                type="email"
+                placeholder="Имэйл нэмэх эсвэл засах"
+                value={form.email}
+                onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+              />
             </div>
             <div className="space-y-2">
               <Label>Утас</Label>

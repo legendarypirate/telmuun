@@ -101,7 +101,7 @@ const menuItems: MenuItemType[] = [
     label: "Хэрэглэгч",
     permission: "log:view_log",
     children: [
-      { key: "/admin/user", icon: <User className="w-4 h-4" />, label: "Харилцагч нар", permission: "log:view_log" },
+      { key: "/admin/user", icon: <User className="w-4 h-4" />, label: "Харилцагчийн жагсаалт", permission: "log:view_log" },
       { key: "/admin/user-driver", icon: <User className="w-4 h-4" />, label: "Жолооч", permission: "log:view_log" },
     ],
   },
