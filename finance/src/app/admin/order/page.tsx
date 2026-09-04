@@ -7,7 +7,6 @@ import { queryKeys } from "@/lib/api";
 import dayjs from "dayjs";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
-import { Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +20,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  FilterBar,
+  FilterChip,
+  FilterClearButton,
+  FilterDate,
+  FilterField,
+  FilterInput,
+} from "@/components/ui/filter-bar";
+import {
   Table,
   TableBody,
   TableCell,
@@ -28,6 +35,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  TableActions,
+  TableEditButton,
+  TableDeleteButton,
+} from "@/components/ui/table-actions";
+import { TablePagination } from "@/components/ui/table-pagination";
 import {
   Dialog,
   DialogContent,
@@ -245,34 +258,67 @@ export default function DeliveryPage() {
   const toggleRow = (id: number) => {
     setSelectedRowKeys((prev) => (prev.includes(id) ? prev.filter((k) => k !== id) : [...prev, id]));
   };
-  const pageCount = Math.max(1, Math.ceil(pagination.total / pagination.pageSize));
 
   return (
     <div className="pb-28">
-      <h1 className="mb-6 text-3xl font-bold">Татан авалт</h1>
-
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Input placeholder="Filter by Phone" value={phoneFilter} onChange={(e) => setPhoneFilter(e.target.value)} className="w-48" />
-        <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-40" />
-        <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-40" />
-        {statusList.map((status) => (
-          <button
-            key={status.id}
-            onClick={() => toggleStatus(status.id)}
-            className={`rounded-md border px-3 py-1 text-sm ${selectedStatuses.includes(status.id) ? "border-green-600 ring-2 ring-green-200" : "border-transparent"}`}
-            style={{ background: status.color, color: "#fff" }}
-          >
-            {status.label}
-          </button>
-        ))}
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Татан авалт</h1>
         {hasPermission("order:create_order") && (
-          <Button className="ml-auto" onClick={() => setIsDrawerVisible(true)}>
+          <Button onClick={() => setIsDrawerVisible(true)}>
             + Захиалга үүсгэх
           </Button>
         )}
       </div>
 
-      <div className="border rounded-md">
+      <FilterBar
+        actions={
+          <>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Төлөв
+              </span>
+              {statusList.map((status) => (
+                <FilterChip
+                  key={status.id}
+                  active={selectedStatuses.includes(status.id)}
+                  onClick={() => toggleStatus(status.id)}
+                  style={{ background: status.color, color: "#fff" }}
+                >
+                  {status.label}
+                </FilterChip>
+              ))}
+            </div>
+            {(phoneFilter || startDate || endDate || selectedStatuses.length > 0) && (
+              <FilterClearButton
+                onClick={() => {
+                  setPhoneFilter("");
+                  setStartDate("");
+                  setEndDate("");
+                  setSelectedStatuses([]);
+                  setPagination((p) => ({ ...p, current: 1 }));
+                }}
+              />
+            )}
+          </>
+        }
+      >
+        <FilterField label="Утас" className="w-40">
+          <FilterInput
+            icon="phone"
+            placeholder="Утас хайх..."
+            value={phoneFilter}
+            onChange={(e) => setPhoneFilter(e.target.value)}
+          />
+        </FilterField>
+        <FilterField label="Эхлэх" className="w-36">
+          <FilterDate value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        </FilterField>
+        <FilterField label="Дуусах" className="w-36">
+          <FilterDate value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        </FilterField>
+      </FilterBar>
+
+      <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>
@@ -314,38 +360,29 @@ export default function DeliveryPage() {
                   </TableCell>
                   <TableCell>{record.comment}</TableCell>
                   <TableCell>{record.driver?.username || "-"}</TableCell>
-                  <TableCell className="flex gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => alert(`Edit ${record.merchant?.username}`)}>
-                      <Edit className="h-4 w-4" /> Edit
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => alert(`Delete ${record.merchant?.username}`)}>
-                      <Trash2 className="h-4 w-4 text-red-500" /> Delete
-                    </Button>
+                  <TableCell>
+                    <TableActions>
+                      <TableEditButton onClick={() => alert(`Edit ${record.merchant?.username}`)} />
+                      <TableDeleteButton onClick={() => alert(`Delete ${record.merchant?.username}`)} />
+                    </TableActions>
                   </TableCell>
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
-      </div>
-
-      <div className="mt-4 flex items-center gap-2">
-        <Select value={String(pagination.pageSize)} onValueChange={(v) => setPagination((p) => ({ ...p, pageSize: Number(v), current: 1 }))}>
-          <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {["10", "20", "50"].map((n) => (
-              <SelectItem key={n} value={n}>{n}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button variant="outline" size="sm" disabled={pagination.current <= 1} onClick={() => setPagination((p) => ({ ...p, current: p.current - 1 }))}>
-          Өмнөх
-        </Button>
-        <span className="text-sm">{pagination.current} / {pageCount}</span>
-        <Button variant="outline" size="sm" disabled={pagination.current >= pageCount} onClick={() => setPagination((p) => ({ ...p, current: p.current + 1 }))}>
-          Дараах
-        </Button>
-        <span className="text-sm text-muted-foreground">Нийт {pagination.total}</span>
+        <div className="px-3 pb-2">
+          <TablePagination
+            current={pagination.current}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            pageSizeOptions={[10, 20, 50]}
+            onPageChange={(page) => setPagination((p) => ({ ...p, current: page }))}
+            onPageSizeChange={(pageSize) =>
+              setPagination((p) => ({ ...p, pageSize, current: 1 }))
+            }
+          />
+        </div>
       </div>
 
       <Sheet open={isDrawerVisible} onOpenChange={setIsDrawerVisible}>

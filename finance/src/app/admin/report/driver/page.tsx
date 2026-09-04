@@ -12,7 +12,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
+import {
+  FilterBar,
+  FilterDate,
+  FilterField,
+} from '@/components/ui/filter-bar';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
@@ -59,51 +63,52 @@ export default function DriverReportPage() {
         <h1 className="text-3xl font-bold text-gray-900">Жолоочийн тайлан</h1>
       </div>
 
-      <div className="mb-6 flex flex-wrap items-center gap-4">
-        <SearchableSelect
-          options={[
-            { value: 'all', label: 'Бүх жолооч' },
-            ...drivers.map((driver) => ({
-              value: driver.id.toString(),
-              label: driver.username,
-            })),
-          ]}
-          value={selectedDriverId?.toString() || 'all'}
-          onValueChange={(value) =>
-            setSelectedDriverId(!value || value === 'all' ? null : parseInt(value, 10))
-          }
-          placeholder="Жолооч сонгох"
-          className="w-56"
-        />
-
-        <div className="flex items-center gap-2">
-          <Input
-            type="date"
+      <FilterBar
+        actions={
+          <Button onClick={loadReportData} disabled={loading} size="sm" className="h-8">
+            {loading ? 'Ачаалж байна...' : 'Хайх'}
+          </Button>
+        }
+      >
+        <FilterField label="Жолооч" className="w-56">
+          <SearchableSelect
+            size="sm"
+            options={[
+              { value: 'all', label: 'Бүх жолооч' },
+              ...drivers.map((driver) => ({
+                value: driver.id.toString(),
+                label: driver.username,
+              })),
+            ]}
+            value={selectedDriverId?.toString() || 'all'}
+            onValueChange={(value) =>
+              setSelectedDriverId(!value || value === 'all' ? null : parseInt(value, 10))
+            }
+            placeholder="Жолооч сонгох"
+            searchPlaceholder="Жолооч хайх..."
+          />
+        </FilterField>
+        <FilterField label="Эхлэх" className="w-36">
+          <FilterDate
             value={formatDateLocal(dateRange[0])}
             onChange={(e) => {
               const start = e.target.value ? new Date(e.target.value) : dateRange[0];
               setDateRange([start, dateRange[1]]);
             }}
-            className="w-40"
           />
-          <span className="text-gray-500">-</span>
-          <Input
-            type="date"
+        </FilterField>
+        <FilterField label="Дуусах" className="w-36">
+          <FilterDate
             value={formatDateLocal(dateRange[1])}
             onChange={(e) => {
               const end = e.target.value ? new Date(e.target.value) : dateRange[1];
               setDateRange([dateRange[0], end]);
             }}
-            className="w-40"
           />
-        </div>
+        </FilterField>
+      </FilterBar>
 
-        <Button onClick={loadReportData} disabled={loading}>
-          {loading ? 'Ачаалж байна...' : 'Хайх'}
-        </Button>
-      </div>
-
-      <div className="border rounded-md overflow-x-auto">
+      <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>

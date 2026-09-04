@@ -22,8 +22,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
-import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
+import {
+  FilterBar,
+  FilterDate,
+  FilterField,
+} from '@/components/ui/filter-bar';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Mail } from 'lucide-react';
 import {
@@ -778,114 +782,120 @@ export default function ReportPage() {
       </div>
 
       {/* Filters Row */}
-      <div className="mb-6 flex flex-wrap items-center gap-4">
-        {/* Date Range */}
-        <div className="flex items-center gap-2">
-          <Input
-            type="date"
+      <FilterBar
+        actions={
+          <>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              <Button onClick={handleSubmit} disabled={loading} size="sm" className="h-8">
+                {loading ? 'Ачааллаж байна...' : 'Хайх'}
+              </Button>
+              <Button
+                onClick={exportToExcel}
+                disabled={loading || reportData.length === 0}
+                variant="outline"
+                size="sm"
+                className="h-8"
+              >
+                Excel татах
+              </Button>
+              {isMerchantReportView && (
+                <Button
+                  onClick={handleSendEmails}
+                  disabled={
+                    loading ||
+                    sendingEmail ||
+                    selectedMerchantIds.length === 0 ||
+                    reportData.length === 0
+                  }
+                  size="sm"
+                  className="h-8"
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  {sendingEmail ? 'Илгээж байна...' : 'Имэйл илгээх'}
+                </Button>
+              )}
+            </div>
+          </>
+        }
+      >
+        <FilterField label="Эхлэх" className="w-36">
+          <FilterDate
             value={dayjs(dateRange[0]).format('YYYY-MM-DD')}
             onChange={(e) => {
               const date = e.target.value ? new Date(e.target.value) : new Date();
               setDateRange([date, dateRange[1]]);
             }}
-            className="w-40"
           />
-          <span className="text-gray-500">~</span>
-          <Input
-            type="date"
+        </FilterField>
+        <FilterField label="Дуусах" className="w-36">
+          <FilterDate
             value={dayjs(dateRange[1]).format('YYYY-MM-DD')}
             onChange={(e) => {
               const date = e.target.value ? new Date(e.target.value) : new Date();
               setDateRange([dateRange[0], date]);
             }}
-            className="w-40"
           />
-        </div>
-
-        {/* Report Type - Hide for customers (role 2) */}
+        </FilterField>
         {!isCustomer && (
-          <Select
-            value={reportType}
-            onValueChange={(value) => setReportType(value as ReportType)}
-          >
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Report Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="driver">Driver</SelectItem>
-              <SelectItem value="now">Now</SelectItem>
-              <SelectItem value="later">Later</SelectItem>
-              <SelectItem value="merchant">Merchant</SelectItem>
-            </SelectContent>
-          </Select>
+          <FilterField label="Төрөл" className="w-40">
+            <Select
+              value={reportType}
+              onValueChange={(value) => setReportType(value as ReportType)}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue placeholder="Тайлангийн төрөл" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="driver">Жолооч</SelectItem>
+                <SelectItem value="now">Now</SelectItem>
+                <SelectItem value="later">Later</SelectItem>
+                <SelectItem value="merchant">Дэлгүүр</SelectItem>
+              </SelectContent>
+            </Select>
+          </FilterField>
         )}
-
-        {/* Conditional Select - Driver or Merchant - Hide for customers (role 2) */}
         {!isCustomer && (
           reportType === 'driver' ? (
-            <SearchableSelect
-              options={[
-                { value: 'all', label: 'All Drivers' },
-                ...drivers.map((driver) => ({
-                  value: driver.id.toString(),
-                  label: driver.username,
-                })),
-              ]}
-              value={selectedId?.toString() || 'all'}
-              onValueChange={(value) =>
-                setSelectedId(value === 'all' ? null : parseInt(value))
-              }
-              placeholder="Select Driver"
-              className="w-48"
-            />
+            <FilterField label="Жолооч" className="w-48">
+              <SearchableSelect
+                size="sm"
+                options={[
+                  { value: 'all', label: 'Бүх жолооч' },
+                  ...drivers.map((driver) => ({
+                    value: driver.id.toString(),
+                    label: driver.username,
+                  })),
+                ]}
+                value={selectedId?.toString() || 'all'}
+                onValueChange={(value) =>
+                  setSelectedId(value === 'all' ? null : parseInt(value))
+                }
+                placeholder="Жолооч сонгох"
+                searchPlaceholder="Жолооч хайх..."
+              />
+            </FilterField>
           ) : (
-            <SearchableSelect
-              options={[
-                { value: 'all', label: 'All Merchants' },
-                ...merchants.map((merchant) => ({
-                  value: merchant.id.toString(),
-                  label: merchant.username,
-                })),
-              ]}
-              value={selectedId?.toString() || 'all'}
-              onValueChange={(value) =>
-                setSelectedId(value === 'all' ? null : parseInt(value))
-              }
-              placeholder="Select Merchant"
-              className="w-48"
-            />
+            <FilterField label="Дэлгүүр" className="w-48">
+              <SearchableSelect
+                size="sm"
+                options={[
+                  { value: 'all', label: 'Бүх дэлгүүр' },
+                  ...merchants.map((merchant) => ({
+                    value: merchant.id.toString(),
+                    label: merchant.username,
+                  })),
+                ]}
+                value={selectedId?.toString() || 'all'}
+                onValueChange={(value) =>
+                  setSelectedId(value === 'all' ? null : parseInt(value))
+                }
+                placeholder="Дэлгүүр сонгох"
+                searchPlaceholder="Дэлгүүр хайх..."
+              />
+            </FilterField>
           )
         )}
-
-        {/* Submit Button */}
-        <Button onClick={handleSubmit} disabled={loading}>
-          {loading ? 'Loading...' : 'Search'}
-        </Button>
-
-        {/* Export Button */}
-        <Button
-          onClick={exportToExcel}
-          disabled={loading || reportData.length === 0}
-          variant="outline"
-        >
-          Export to Excel
-        </Button>
-
-        {isMerchantReportView && (
-          <Button
-            onClick={handleSendEmails}
-            disabled={
-              loading ||
-              sendingEmail ||
-              selectedMerchantIds.length === 0 ||
-              reportData.length === 0
-            }
-          >
-            <Mail className="h-4 w-4 mr-2" />
-            {sendingEmail ? 'Илгээж байна...' : 'Имэйл илгээх'}
-          </Button>
-        )}
-      </div>
+      </FilterBar>
 
       {isMerchantReportView && selectedMerchantIds.length > 0 && (
         <p className="text-sm text-gray-600 mb-2">
@@ -894,7 +904,7 @@ export default function ReportPage() {
       )}
 
       {/* Report Table */}
-      <div className="rounded-md border">
+      <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>

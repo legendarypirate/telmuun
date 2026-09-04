@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { TablePagination } from '@/components/ui/table-pagination';
 import { GoodRequest } from './types/good-request';
 import {
   createGoodRequest,
@@ -257,38 +258,13 @@ export default function GoodRequestPage() {
       />
 
       {pagination.total > 0 && (
-        <div className="mt-4 flex justify-between items-center">
-          <div className="text-sm text-gray-600">
-            Нийт: {pagination.total} | Хуудас: {pagination.current} /{' '}
-            {Math.max(1, Math.ceil(pagination.total / PAGE_SIZE))}
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() =>
-                setPagination((prev) => ({ ...prev, current: Math.max(1, prev.current - 1) }))
-              }
-              disabled={pagination.current === 1}
-            >
-              Өмнөх
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() =>
-                setPagination((prev) => ({
-                  ...prev,
-                  current: Math.min(
-                    Math.ceil(pagination.total / PAGE_SIZE),
-                    prev.current + 1
-                  ),
-                }))
-              }
-              disabled={pagination.current >= Math.ceil(pagination.total / PAGE_SIZE)}
-            >
-              Дараах
-            </Button>
-          </div>
-        </div>
+        <TablePagination
+          current={pagination.current}
+          pageSize={PAGE_SIZE}
+          total={pagination.total}
+          showPageSize={false}
+          onPageChange={(page) => setPagination((prev) => ({ ...prev, current: page }))}
+        />
       )}
 
       {/* Create Request Drawer (only for merchants) */}

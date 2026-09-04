@@ -6,13 +6,12 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  FilterBar,
+  FilterClearButton,
+  FilterField,
+} from "@/components/ui/filter-bar";
 import {
   Table,
   TableBody,
@@ -21,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 interface General {
   id: number;
@@ -153,30 +153,49 @@ export default function GeneralReportPage() {
   };
 
   const paged = data.slice((page - 1) * pageSize, page * pageSize);
-  const pageCount = Math.max(1, Math.ceil(data.length / pageSize));
 
   return (
     <div className="p-5">
       <h4 className="mb-4 text-xl font-bold">Ерөнхий тайлан</h4>
 
       {!isMerchant && (
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          <Select value={merchantId || undefined} onValueChange={setMerchantId}>
-            <SelectTrigger className="w-[200px]"><SelectValue placeholder="Select Merchant" /></SelectTrigger>
-            <SelectContent>
-              {merchants.map((merchant) => (
-                <SelectItem key={merchant.id} value={String(merchant.id)}>{merchant.username}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button variant="outline" onClick={fetchData}>Apply Filters</Button>
-        </div>
+        <FilterBar
+          actions={
+            merchantId ? (
+              <FilterClearButton
+                onClick={() => {
+                  setMerchantId("");
+                  setPage(1);
+                }}
+              />
+            ) : undefined
+          }
+        >
+          <FilterField label="Дэлгүүр" className="w-48">
+            <SearchableSelect
+              size="sm"
+              value={merchantId || undefined}
+              onValueChange={(v) => setMerchantId(v || "")}
+              placeholder="Дэлгүүр сонгох"
+              searchPlaceholder="Дэлгүүр хайх..."
+              options={merchants.map((merchant) => ({
+                value: String(merchant.id),
+                label: merchant.username,
+              }))}
+            />
+          </FilterField>
+          <FilterField>
+            <Button variant="outline" size="sm" className="h-8" onClick={fetchData}>
+              Шүүх
+            </Button>
+          </FilterField>
+        </FilterBar>
       )}
 
       {loading ? (
         <p className="py-8 text-center text-muted-foreground">Ачааллаж байна...</p>
       ) : (
-        <div className="border rounded-md">
+        <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>
@@ -222,14 +241,17 @@ export default function GeneralReportPage() {
               ))}
             </TableBody>
           </Table>
+          <div className="px-3 pb-2">
+            <TablePagination
+              current={page}
+              pageSize={pageSize}
+              total={data.length}
+              showPageSize={false}
+              onPageChange={setPage}
+            />
+          </div>
         </div>
       )}
-
-      <div className="mt-4 flex items-center gap-2">
-        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Өмнөх</Button>
-        <span className="text-sm">{page} / {pageCount}</span>
-        <Button variant="outline" size="sm" disabled={page >= pageCount} onClick={() => setPage((p) => p + 1)}>Дараах</Button>
-      </div>
     </div>
   );
 }

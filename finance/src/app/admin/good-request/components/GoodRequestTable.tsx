@@ -9,8 +9,8 @@ import {
   createColumnHelper,
 } from '@tanstack/react-table';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
 import { Check, X } from 'lucide-react';
+import { TableActions, TableActionButton } from '@/components/ui/table-actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
@@ -153,26 +153,20 @@ export default function GoodRequestTable({
                 const request = info.row.original;
                 if (request.status === 1 && onApprove && onDecline) {
                   return (
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                    <TableActions>
+                      <TableActionButton
+                        variant="default"
+                        icon={Check}
                         onClick={() => onApprove(request)}
-                      >
-                        <Check className="h-4 w-4 mr-1" />
-                        Зөвшөөрөх
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        title="Зөвшөөрөх"
+                      />
+                      <TableActionButton
+                        variant="delete"
+                        icon={X}
                         onClick={() => onDecline(request)}
-                      >
-                        <X className="h-4 w-4 mr-1" />
-                        Татгалзах
-                      </Button>
-                    </div>
+                        title="Татгалзах"
+                      />
+                    </TableActions>
                   );
                 }
                 return <span className="text-sm text-gray-400">Дууссан</span>;

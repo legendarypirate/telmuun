@@ -5,10 +5,14 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUsers } from "@/hooks/use-lookups";
 import { getAuthHeaders, queryKeys } from "@/lib/api";
-import { Lock, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  FilterBar,
+  FilterField,
+  FilterInput,
+} from "@/components/ui/filter-bar";
 import {
   Table,
   TableBody,
@@ -17,6 +21,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  TableActions,
+  TableEditButton,
+  TableDeleteButton,
+  TableLockButton,
+} from "@/components/ui/table-actions";
 import {
   Dialog,
   DialogContent,
@@ -198,17 +208,22 @@ export default function UsersPage() {
         <Button onClick={openCreate}>+ Харилцагч үүсгэх</Button>
       </div>
 
-      <div className="mb-4 flex items-center gap-4">
+      <div className="mb-3 flex items-center gap-4">
         <div className="text-sm text-muted-foreground">Нийт: {customers.length}</div>
-        <Input
-          placeholder="Нэр, имэйл, утсаар хайх..."
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          className="w-72"
-        />
       </div>
 
-      <div className="border rounded-md">
+      <FilterBar>
+        <FilterField label="Хайх" className="w-72">
+          <FilterInput
+            icon="search"
+            placeholder="Нэр, имэйл, утсаар хайх..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+          />
+        </FilterField>
+      </FilterBar>
+
+      <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>
@@ -245,31 +260,23 @@ export default function UsersPage() {
                   </TableCell>
                   <TableCell>{record.phone}</TableCell>
                   <TableCell>{Number(record.report_price || 7000).toLocaleString()} ₮</TableCell>
-                  <TableCell className="flex gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => openEdit(record)} title="Засах">
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedUser(record);
-                        setNewPassword("");
-                        setPasswordModalVisible(true);
-                      }}
-                    >
-                      <Lock className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedUser(record);
-                        setDeleteOpen(true);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
+                  <TableCell>
+                    <TableActions>
+                      <TableEditButton onClick={() => openEdit(record)} />
+                      <TableLockButton
+                        onClick={() => {
+                          setSelectedUser(record);
+                          setNewPassword("");
+                          setPasswordModalVisible(true);
+                        }}
+                      />
+                      <TableDeleteButton
+                        onClick={() => {
+                          setSelectedUser(record);
+                          setDeleteOpen(true);
+                        }}
+                      />
+                    </TableActions>
                   </TableCell>
                 </TableRow>
               ))

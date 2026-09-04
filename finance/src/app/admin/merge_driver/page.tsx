@@ -10,13 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  FilterBar,
+  FilterClearButton,
+  FilterDate,
+  FilterField,
+} from "@/components/ui/filter-bar";
 import {
   Table,
   TableBody,
@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -189,30 +190,67 @@ export default function MergeReportPage() {
   const totalCount = selectedItems.length;
   const totalPrice = selectedItems.reduce((sum, item) => sum + parseFloat(item.price || "0"), 0);
   const paged = data.slice((page - 1) * pageSize, page * pageSize);
-  const pageCount = Math.max(1, Math.ceil(data.length / pageSize));
 
   return (
     <div className="pb-24 p-5">
       <h4 className="mb-4 text-xl font-bold">Жолоочийн нийлсэн тайлан</h4>
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Select value={driverId || undefined} onValueChange={setDriverId}>
-          <SelectTrigger className="w-[200px]"><SelectValue placeholder="Select Driver" /></SelectTrigger>
-          <SelectContent>
-            {drivers.map((driver) => (
-              <SelectItem key={driver.id} value={String(driver.id)}>{driver.username}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(1); }} className="w-40" />
-        <Input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1); }} className="w-40" />
-        <Button variant="outline" onClick={fetchData}>Apply Filters</Button>
-      </div>
+      <FilterBar
+        actions={
+          (driverId || startDate || endDate) ? (
+            <FilterClearButton
+              onClick={() => {
+                setDriverId("");
+                setStartDate("");
+                setEndDate("");
+                setPage(1);
+              }}
+            />
+          ) : undefined
+        }
+      >
+        <FilterField label="Жолооч" className="w-48">
+          <SearchableSelect
+            size="sm"
+            value={driverId || undefined}
+            onValueChange={(v) => setDriverId(v || "")}
+            placeholder="Жолооч сонгох"
+            searchPlaceholder="Жолооч хайх..."
+            options={drivers.map((driver) => ({
+              value: String(driver.id),
+              label: driver.username,
+            }))}
+          />
+        </FilterField>
+        <FilterField label="Эхлэх" className="w-36">
+          <FilterDate
+            value={startDate}
+            onChange={(e) => {
+              setStartDate(e.target.value);
+              setPage(1);
+            }}
+          />
+        </FilterField>
+        <FilterField label="Дуусах" className="w-36">
+          <FilterDate
+            value={endDate}
+            onChange={(e) => {
+              setEndDate(e.target.value);
+              setPage(1);
+            }}
+          />
+        </FilterField>
+        <FilterField>
+          <Button variant="outline" size="sm" className="h-8" onClick={fetchData}>
+            Шүүх
+          </Button>
+        </FilterField>
+      </FilterBar>
 
       {loading ? (
         <p className="py-8 text-center text-muted-foreground">Ачааллаж байна...</p>
       ) : (
-        <div className="border rounded-md">
+        <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>
@@ -277,20 +315,21 @@ export default function MergeReportPage() {
               ))}
             </TableBody>
           </Table>
+          <div className="px-3 pb-2">
+            <TablePagination
+              current={page}
+              pageSize={pageSize}
+              total={data.length}
+              pageSizeOptions={[100, 200, 300, 500]}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+              }}
+            />
+          </div>
         </div>
       )}
-
-      <div className="mt-4 flex items-center gap-2">
-        <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
-          <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {["100", "200", "300", "500"].map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Өмнөх</Button>
-        <span className="text-sm">{page} / {pageCount}</span>
-        <Button variant="outline" size="sm" disabled={page >= pageCount} onClick={() => setPage((p) => p + 1)}>Дараах</Button>
-      </div>
 
       <div className="fixed bottom-0 left-64 right-0 z-[999] flex flex-wrap items-center gap-4 border-t bg-background p-4">
         <span>✅ Selected Items: <b>{totalCount}</b></span>

@@ -19,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 interface Merchant {
   id: number;
@@ -108,7 +108,6 @@ export default function MerchantsPage() {
   }
 
   const paged = bulks.slice((page - 1) * pageSize, page * pageSize);
-  const pageCount = Math.max(1, Math.ceil(bulks.length / pageSize));
 
   return (
     <div className="min-h-full">
@@ -186,11 +185,13 @@ export default function MerchantsPage() {
                   </TableBody>
                 </Table>
               </div>
-              <div className="mt-3 flex items-center gap-2">
-                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Өмнөх</Button>
-                <span className="text-sm">{page} / {pageCount}</span>
-                <Button variant="outline" size="sm" disabled={page >= pageCount} onClick={() => setPage((p) => p + 1)}>Дараах</Button>
-              </div>
+              <TablePagination
+                current={page}
+                pageSize={pageSize}
+                total={bulks.length}
+                showPageSize={false}
+                onPageChange={setPage}
+              />
             </>
           )}
         </DialogContent>

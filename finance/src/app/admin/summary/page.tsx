@@ -2,8 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
-import { Eye } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -22,6 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TableActions, TableViewButton } from "@/components/ui/table-actions";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 interface SummaryType {
@@ -161,7 +161,6 @@ export default function DeliveryPage() {
   };
 
   const paged = tableData.slice((pagination.current - 1) * pagination.pageSize, pagination.current * pagination.pageSize);
-  const pageCount = Math.max(1, Math.ceil(tableData.length / pagination.pageSize));
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -241,7 +240,7 @@ export default function DeliveryPage() {
                 <TableHead>Нийт</TableHead>
                 <TableHead>Жолоочийн цалин</TableHead>
                 <TableHead>Тооцоо</TableHead>
-                <TableHead>Үзэх</TableHead>
+                <TableHead>Үйлдэл</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -258,24 +257,25 @@ export default function DeliveryPage() {
                   <TableCell>{(record as any).driver}</TableCell>
                   <TableCell>{record.account}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="sm" onClick={() => handleShowDeliveries(record.id)}>
-                      <Eye className="h-4 w-4" /> Хүргэлтүүд харах
-                    </Button>
+                    <TableActions>
+                      <TableViewButton
+                        onClick={() => handleShowDeliveries(record.id)}
+                        title="Хүргэлтүүд харах"
+                      />
+                    </TableActions>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
-        <div className="mt-4 flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled={pagination.current <= 1} onClick={() => setPagination((p) => ({ ...p, current: p.current - 1 }))}>
-            Өмнөх
-          </Button>
-          <span className="text-sm">{pagination.current} / {pageCount}</span>
-          <Button variant="outline" size="sm" disabled={pagination.current >= pageCount} onClick={() => setPagination((p) => ({ ...p, current: p.current + 1 }))}>
-            Дараах
-          </Button>
-        </div>
+        <TablePagination
+          current={pagination.current}
+          pageSize={pagination.pageSize}
+          total={tableData.length}
+          showPageSize={false}
+          onPageChange={(page) => setPagination((p) => ({ ...p, current: page }))}
+        />
       </div>
 
       <Sheet open={drawerVisible} onOpenChange={setDrawerVisible}>

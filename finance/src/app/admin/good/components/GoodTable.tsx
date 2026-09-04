@@ -9,8 +9,13 @@ import {
   createColumnHelper,
 } from '@tanstack/react-table';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Edit, FilePenLine, Trash2, History } from 'lucide-react';
+import { FilePenLine, History } from 'lucide-react';
+import {
+  TableActions,
+  TableEditButton,
+  TableDeleteButton,
+  TableActionButton,
+} from '@/components/ui/table-actions';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface GoodTableProps {
@@ -70,44 +75,27 @@ export default function GoodTable({
               id: 'actions',
               header: 'Үйлдэл',
               cell: (info) => (
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                <TableActions>
+                  <TableEditButton
                     onClick={() => onEdit(info.row.original)}
                     title="Орлого / зарлага"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
+                  />
                   {onEditName && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
+                    <TableActionButton
+                      icon={FilePenLine}
                       onClick={() => onEditName(info.row.original)}
                       title="Барааны нэр засах"
-                    >
-                      <FilePenLine className="h-4 w-4" />
-                    </Button>
+                    />
                   )}
                   {onHistory && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
+                    <TableActionButton
+                      icon={History}
                       onClick={() => onHistory(info.row.original)}
                       title="Түүх харах"
-                    >
-                      <History className="h-4 w-4" />
-                    </Button>
+                    />
                   )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onDelete(info.row.original)}
-                    title="Устгах"
-                  >
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
-                </div>
+                  <TableDeleteButton onClick={() => onDelete(info.row.original)} />
+                </TableActions>
               ),
             }),
           ]

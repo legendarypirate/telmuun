@@ -9,8 +9,7 @@ import {
   createColumnHelper,
 } from '@tanstack/react-table';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Trash2 } from 'lucide-react';
+import { TableActions, TableDeleteButton } from '@/components/ui/table-actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
@@ -51,14 +50,9 @@ export default function WarehouseTable({
         id: 'actions',
         header: 'Үйлдэл',
         cell: (info) => (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onDelete(info.row.original)}
-            title="Устгах"
-          >
-            <Trash2 className="h-4 w-4 text-red-500" />
-          </Button>
+          <TableActions>
+            <TableDeleteButton onClick={() => onDelete(info.row.original)} />
+          </TableActions>
         ),
       }),
     ],

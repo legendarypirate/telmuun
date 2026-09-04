@@ -4,20 +4,21 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
-import { Edit, Eye, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import {
+  FilterBar,
+  FilterChip,
+  FilterClearButton,
+  FilterDate,
+  FilterField,
+  FilterInput,
+} from "@/components/ui/filter-bar";
 import {
   Table,
   TableBody,
@@ -26,6 +27,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  TableActions,
+  TableEditButton,
+  TableViewButton,
+} from "@/components/ui/table-actions";
+import { TablePagination } from "@/components/ui/table-pagination";
 import {
   Dialog,
   DialogContent,
@@ -593,7 +600,6 @@ export default function DeliveryPage() {
   );
 
   const hasPermission = (perm: string) => permissions.includes(perm);
-  const pageCount = Math.max(1, Math.ceil(pagination.total / pagination.pageSize));
 
   return (
     <div className="pb-28">
@@ -607,75 +613,155 @@ export default function DeliveryPage() {
         </Button>
       </div>
 
-      <div className="mb-3 rounded-lg border bg-card p-3 flex flex-wrap items-center gap-2">
-        <Input
-          placeholder="Утас"
-          value={phoneFilter}
-          onChange={(e) => setPhoneFilter(e.target.value)}
-          className="w-40"
-        />
-        <Input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPagination((p) => ({ ...p, current: 1 })); }} className="w-36" />
-        <Input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPagination((p) => ({ ...p, current: 1 })); }} className="w-36" />
-        <SearchableSelect
-          className="w-44"
-          value={districtFilter}
-          onValueChange={(v) => { setDistrictFilter(v || "all"); setPagination((p) => ({ ...p, current: 1 })); }}
-          placeholder="Дүүрэг"
-          searchPlaceholder="Дүүрэг хайх..."
-          options={[
-            { value: "all", label: "Бүх дүүрэг" },
-            ...DISTRICTS.map((d) => ({ value: String(d.id), label: d.name })),
-          ]}
-        />
-        {statusList.map((status) => (
-          <button
-            key={status.id}
-            onClick={() => toggleStatus(status.id)}
-            className={`rounded-md border px-3 py-1.5 text-sm ${selectedStatuses.includes(status.id) ? "border-green-600 ring-2 ring-green-200" : "border-border"}`}
-            style={statusChipStyle(status.status, status.color)}
-          >
-            {status.status}
-          </button>
-        ))}
+      <FilterBar
+        actions={
+          <>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Төлөв
+              </span>
+              {statusList.map((status) => (
+                <FilterChip
+                  key={status.id}
+                  active={selectedStatuses.includes(status.id)}
+                  onClick={() => toggleStatus(status.id)}
+                  style={statusChipStyle(status.status, status.color)}
+                >
+                  {status.status}
+                </FilterChip>
+              ))}
+            </div>
+            {(phoneFilter ||
+              districtFilter !== "all" ||
+              driverFilter !== "all" ||
+              merchantFilter !== "all" ||
+              selectedStatuses.length > 0) && (
+              <FilterClearButton
+                onClick={() => {
+                  setPhoneFilter("");
+                  setDistrictFilter("all");
+                  setDriverFilter("all");
+                  setMerchantFilter("all");
+                  setSelectedStatuses([]);
+                  setStartDate(formatDateLocal(new Date()));
+                  setEndDate(formatDateLocal(new Date()));
+                  setPagination((p) => ({ ...p, current: 1 }));
+                }}
+              />
+            )}
+            {canUseExcelImport && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  Excel импорт
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) processExcelFile(file);
+                  }}
+                />
+              </>
+            )}
+          </>
+        }
+      >
+        <FilterField label="Утас" className="w-40">
+          <FilterInput
+            icon="phone"
+            placeholder="Утас хайх..."
+            value={phoneFilter}
+            onChange={(e) => setPhoneFilter(e.target.value)}
+          />
+        </FilterField>
+        <FilterField label="Эхлэх" className="w-36">
+          <FilterDate
+            value={startDate}
+            onChange={(e) => {
+              setStartDate(e.target.value);
+              setPagination((p) => ({ ...p, current: 1 }));
+            }}
+          />
+        </FilterField>
+        <FilterField label="Дуусах" className="w-36">
+          <FilterDate
+            value={endDate}
+            onChange={(e) => {
+              setEndDate(e.target.value);
+              setPagination((p) => ({ ...p, current: 1 }));
+            }}
+          />
+        </FilterField>
+        <FilterField label="Дүүрэг" className="w-44">
+          <SearchableSelect
+            size="sm"
+            value={districtFilter}
+            onValueChange={(v) => {
+              setDistrictFilter(v || "all");
+              setPagination((p) => ({ ...p, current: 1 }));
+            }}
+            placeholder="Дүүрэг"
+            searchPlaceholder="Дүүрэг хайх..."
+            options={[
+              { value: "all", label: "Бүх дүүрэг" },
+              ...DISTRICTS.map((d) => ({ value: String(d.id), label: d.name })),
+            ]}
+          />
+        </FilterField>
         {!isMerchant && (
           <>
-            <SearchableSelect
-              className="w-44"
-              value={driverFilter}
-              onValueChange={(v) => { setDriverFilter(v || "all"); setPagination((p) => ({ ...p, current: 1 })); }}
-              placeholder="Жолооч"
-              searchPlaceholder="Жолооч хайх..."
-              options={[
-                { value: "all", label: "Бүх жолооч" },
-                ...drivers.map((d) => ({ value: String(d.id), label: d.username })),
-              ]}
-            />
-            <SearchableSelect
-              className="w-48"
-              value={merchantFilter}
-              onValueChange={(v) => { setMerchantFilter(v || "all"); setPagination((p) => ({ ...p, current: 1 })); }}
-              placeholder="Дэлгүүр"
-              searchPlaceholder="Дэлгүүр хайх..."
-              options={[
-                { value: "all", label: "Бүх дэлгүүр" },
-                ...merchants.map((m) => ({ value: String(m.id), label: m.username })),
-              ]}
-            />
+            <FilterField label="Жолооч" className="w-44">
+              <SearchableSelect
+                size="sm"
+                value={driverFilter}
+                onValueChange={(v) => {
+                  setDriverFilter(v || "all");
+                  setPagination((p) => ({ ...p, current: 1 }));
+                }}
+                placeholder="Жолооч"
+                searchPlaceholder="Жолооч хайх..."
+                options={[
+                  { value: "all", label: "Бүх жолооч" },
+                  ...drivers.map((d) => ({
+                    value: String(d.id),
+                    label: d.username,
+                  })),
+                ]}
+              />
+            </FilterField>
+            <FilterField label="Дэлгүүр" className="w-48">
+              <SearchableSelect
+                size="sm"
+                value={merchantFilter}
+                onValueChange={(v) => {
+                  setMerchantFilter(v || "all");
+                  setPagination((p) => ({ ...p, current: 1 }));
+                }}
+                placeholder="Дэлгүүр"
+                searchPlaceholder="Дэлгүүр хайх..."
+                options={[
+                  { value: "all", label: "Бүх дэлгүүр" },
+                  ...merchants.map((m) => ({
+                    value: String(m.id),
+                    label: m.username,
+                  })),
+                ]}
+              />
+            </FilterField>
           </>
         )}
-        {canUseExcelImport && (
-          <>
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>Excel импорт</Button>
-            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) processExcelFile(file);
-            }} />
-          </>
-        )}
-      </div>
+      </FilterBar>
 
-      <div className="border rounded-lg overflow-x-auto">
-        <Table className="[&_th]:px-2 [&_th]:py-2 [&_td]:px-2 [&_td]:py-2">
+      <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
+        <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-10"><Checkbox checked={deliveryData.length > 0 && selectedRowKeys.length === deliveryData.length} onCheckedChange={toggleAll} /></TableHead>
@@ -688,111 +774,111 @@ export default function DeliveryPage() {
               <TableHead>Үнэ</TableHead>
               <TableHead className="min-w-[140px] max-w-[240px] whitespace-normal">Тайлбар</TableHead>
               <TableHead className="min-w-[140px] max-w-[240px] whitespace-normal">Ж/тайлбар</TableHead>
-              {!isMerchant && <TableHead>Жолооч</TableHead>}
-              {!isMerchant && <TableHead>Үйлдэл</TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tableLoading ? (
-              <TableRow><TableCell colSpan={12} className="py-10 text-center text-muted-foreground">Ачааллаж байна...</TableCell></TableRow>
-            ) : deliveryData.length === 0 ? (
-              <TableRow><TableCell colSpan={12} className="py-10 text-center text-muted-foreground">Хүргэлт олдсонгүй</TableCell></TableRow>
-            ) : deliveryData.map((record) => (
-              <React.Fragment key={record.id}>
-                <TableRow>
-                  <TableCell><Checkbox checked={selectedRowKeys.includes(record.id)} onCheckedChange={() => toggleRow(record.id)} /></TableCell>
-                  <TableCell>{dayjs(record.createdAt).format("YYYY-MM-DD HH:mm")}</TableCell>
-                  <TableCell>
-                    {record.delivery_date
-                      ? dayjs(record.delivery_date).format("YYYY-MM-DD")
-                      : dayjs(record.createdAt).format("YYYY-MM-DD")}
-                  </TableCell>
-                  {!isMerchant && <TableCell>{record.merchant?.username || "-"}</TableCell>}
-                  <TableCell>{districtName(record.district_id)}</TableCell>
-                  <TableCell className="max-w-[280px] whitespace-normal align-top">
-                    <button className="text-left w-full" onClick={() => handleExpand(record.id)}>
-                      <div className="break-words">{record.phone}</div>
-                      <div className="whitespace-normal break-words">
-                        {record.address}
-                      </div>
-                    </button>
-                  </TableCell>
-                  <TableCell>
-                    <Badge style={statusChipStyle(record.status_name?.status, record.status_name?.color)}>
-                      {record.status_name?.status || record.status}
-                      {(record.status === 10 || record.status === "10") && record.postponed_number ? ` (${record.postponed_number})` : ""}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{Number(record.price || 0).toLocaleString()} ₮</TableCell>
-                  <TableCell className="max-w-[240px] whitespace-normal align-top break-words">
-                    {record.comment}
-                  </TableCell>
-                  <TableCell className="max-w-[240px] whitespace-normal align-top break-words">
-                    {record.driver_comment || "-"}
-                  </TableCell>
-                  {!isMerchant && <TableCell>{record.driver?.username || "-"}</TableCell>}
-                  {!isMerchant && (
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => {
-                          setSelectedDelivery(record);
-                          setEditForm({
-                            phone: record.phone,
-                            address: record.address,
-                            price: String(record.price ?? ""),
-                            districtId: record.district_id ? String(record.district_id) : "",
-                            deliveryDate: record.delivery_date
-                              ? dayjs(record.delivery_date).format("YYYY-MM-DD")
-                              : dayjs(record.createdAt).format("YYYY-MM-DD"),
-                          });
-                          setIsEditOpen(true);
-                        }}><Edit className="h-4 w-4" /></Button>
-                        {record.image && (
-                          <Button variant="ghost" size="sm" onClick={() => { setSelectedImageUrl(record.image!); setIsImageOpen(true); }}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  )}
+                  {!isMerchant && <TableHead>Жолооч</TableHead>}
+                  {!isMerchant && <TableHead className="text-right">Үйлдэл</TableHead>}
                 </TableRow>
-                {expandedId === record.id && (
-                  <TableRow>
-                    <TableCell colSpan={12} className="bg-muted/40 px-6 py-4">
-                      {(expandedItems[record.id] || []).length === 0 ? (
-                        <p className="text-sm text-muted-foreground">Бараа олдсонгүй</p>
-                      ) : (
-                        <div className="space-y-1 text-sm">
-                          {expandedItems[record.id].map((item) => (
-                            <div key={item.id}>{item.good?.name || "-"} × {item.quantity}</div>
-                          ))}
-                        </div>
+              </TableHeader>
+              <TableBody>
+                {tableLoading ? (
+                  <TableRow><TableCell colSpan={12} className="py-10 text-center text-muted-foreground">Ачааллаж байна...</TableCell></TableRow>
+                ) : deliveryData.length === 0 ? (
+                  <TableRow><TableCell colSpan={12} className="py-10 text-center text-muted-foreground">Хүргэлт олдсонгүй</TableCell></TableRow>
+                ) : deliveryData.map((record) => (
+                  <React.Fragment key={record.id}>
+                    <TableRow>
+                      <TableCell><Checkbox checked={selectedRowKeys.includes(record.id)} onCheckedChange={() => toggleRow(record.id)} /></TableCell>
+                      <TableCell>{dayjs(record.createdAt).format("YYYY-MM-DD HH:mm")}</TableCell>
+                      <TableCell>
+                        {record.delivery_date
+                          ? dayjs(record.delivery_date).format("YYYY-MM-DD")
+                          : dayjs(record.createdAt).format("YYYY-MM-DD")}
+                      </TableCell>
+                      {!isMerchant && <TableCell>{record.merchant?.username || "-"}</TableCell>}
+                      <TableCell>{districtName(record.district_id)}</TableCell>
+                      <TableCell className="max-w-[280px] whitespace-normal align-top">
+                        <button className="text-left w-full" onClick={() => handleExpand(record.id)}>
+                          <div className="break-words">{record.phone}</div>
+                          <div className="whitespace-normal break-words">
+                            {record.address}
+                          </div>
+                        </button>
+                      </TableCell>
+                      <TableCell>
+                        <Badge style={statusChipStyle(record.status_name?.status, record.status_name?.color)}>
+                          {record.status_name?.status || record.status}
+                          {(record.status === 10 || record.status === "10") && record.postponed_number ? ` (${record.postponed_number})` : ""}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{Number(record.price || 0).toLocaleString()} ₮</TableCell>
+                      <TableCell className="max-w-[240px] whitespace-normal align-top break-words">
+                        {record.comment}
+                      </TableCell>
+                      <TableCell className="max-w-[240px] whitespace-normal align-top break-words">
+                        {record.driver_comment || "-"}
+                      </TableCell>
+                      {!isMerchant && <TableCell>{record.driver?.username || "-"}</TableCell>}
+                      {!isMerchant && (
+                        <TableCell>
+                          <TableActions>
+                            <TableEditButton
+                              onClick={() => {
+                                setSelectedDelivery(record);
+                                setEditForm({
+                                  phone: record.phone,
+                                  address: record.address,
+                                  price: String(record.price ?? ""),
+                                  districtId: record.district_id ? String(record.district_id) : "",
+                                  deliveryDate: record.delivery_date
+                                    ? dayjs(record.delivery_date).format("YYYY-MM-DD")
+                                    : dayjs(record.createdAt).format("YYYY-MM-DD"),
+                                });
+                                setIsEditOpen(true);
+                              }}
+                            />
+                            {record.image && (
+                              <TableViewButton
+                                onClick={() => {
+                                  setSelectedImageUrl(record.image!);
+                                  setIsImageOpen(true);
+                                }}
+                              />
+                            )}
+                          </TableActions>
+                        </TableCell>
                       )}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </React.Fragment>
-            ))}
-          </TableBody>
-        </Table>
+                    </TableRow>
+                    {expandedId === record.id && (
+                      <TableRow>
+                        <TableCell colSpan={12} className="bg-muted/40 px-6 py-4">
+                          {(expandedItems[record.id] || []).length === 0 ? (
+                            <p className="text-sm text-muted-foreground">Бараа олдсонгүй</p>
+                          ) : (
+                            <div className="space-y-1 text-sm">
+                              {expandedItems[record.id].map((item) => (
+                                <div key={item.id}>{item.good?.name || "-"} × {item.quantity}</div>
+                              ))}
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
+                ))}
+              </TableBody>
+            </Table>
+          <div className="px-3 pb-2">
+            <TablePagination
+              current={pagination.current}
+              pageSize={pagination.pageSize}
+              total={pagination.total}
+              pageSizeOptions={[10, 50, 100, 500, 1000]}
+              onPageChange={(page) => setPagination((p) => ({ ...p, current: page }))}
+              onPageSizeChange={(pageSize) =>
+                setPagination((p) => ({ ...p, pageSize, current: 1 }))
+              }
+            />
+          </div>
       </div>
-
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Хуудас:</span>
-          <Select value={String(pagination.pageSize)} onValueChange={(v) => setPagination((p) => ({ ...p, pageSize: Number(v), current: 1 }))}>
-            <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {["10", "50", "100", "500", "1000"].map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="sm" disabled={pagination.current <= 1} onClick={() => setPagination((p) => ({ ...p, current: p.current - 1 }))}>Өмнөх</Button>
-          <span className="text-sm">{pagination.current} / {pageCount}</span>
-          <Button variant="outline" size="sm" disabled={pagination.current >= pageCount} onClick={() => setPagination((p) => ({ ...p, current: p.current + 1 }))}>Дараах</Button>
-          <span className="text-sm text-muted-foreground">Нийт {pagination.total}</span>
-        </div>
-      </div>
-
       {selectedRowKeys.length > 0 && (
         <div className="fixed bottom-0 left-64 right-0 border-t bg-background p-4 flex flex-wrap items-center gap-3">
           <span className="text-sm font-medium">{selectedRowKeys.length} сонгосон · {selectedTotal.toLocaleString()} ₮</span>

@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 interface Notification {
@@ -86,7 +87,6 @@ export default function NotificationPage() {
     setSelectedRowKeys((prev) => (prev.includes(id) ? prev.filter((k) => k !== id) : [...prev, id]));
   };
   const paged = regionData.slice((pagination.current - 1) * pagination.pageSize, pagination.current * pagination.pageSize);
-  const pageCount = Math.max(1, Math.ceil(regionData.length / pagination.pageSize));
 
   return (
     <div className="pb-24">
@@ -95,7 +95,7 @@ export default function NotificationPage() {
         <Button onClick={() => setIsDrawerVisible(true)}>+ Мэдэгдэл илгээх</Button>
       </div>
 
-      <div className="border rounded-md">
+      <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>
@@ -131,16 +131,17 @@ export default function NotificationPage() {
             ))}
           </TableBody>
         </Table>
-      </div>
-
-      <div className="mt-4 flex items-center gap-2">
-        <Button variant="outline" size="sm" disabled={pagination.current <= 1} onClick={() => setPagination((p) => ({ ...p, current: p.current - 1 }))}>
-          Өмнөх
-        </Button>
-        <span className="text-sm">{pagination.current} / {pageCount}</span>
-        <Button variant="outline" size="sm" disabled={pagination.current >= pageCount} onClick={() => setPagination((p) => ({ ...p, current: p.current + 1 }))}>
-          Дараах
-        </Button>
+        <div className="px-3 pb-2">
+          <TablePagination
+            current={pagination.current}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            onPageChange={(page) => setPagination((p) => ({ ...p, current: page }))}
+            onPageSizeChange={(pageSize) =>
+              setPagination((p) => ({ ...p, pageSize, current: 1 }))
+            }
+          />
+        </div>
       </div>
 
       <Sheet open={isDrawerVisible} onOpenChange={setIsDrawerVisible}>

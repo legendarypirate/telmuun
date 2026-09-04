@@ -21,6 +21,7 @@ interface SearchableSelectProps {
   emptyMessage?: string;
   className?: string;
   disabled?: boolean;
+  size?: "default" | "sm";
 }
 
 export function SearchableSelect({
@@ -32,6 +33,7 @@ export function SearchableSelect({
   emptyMessage = "No results found.",
   className,
   disabled = false,
+  size = "default",
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -135,7 +137,10 @@ export function SearchableSelect({
         variant="outline"
         role="combobox"
         aria-expanded={open}
-        className="w-full justify-between font-normal"
+        className={cn(
+          "w-full justify-between font-normal shadow-none",
+          size === "sm" && "h-8 rounded-lg px-2.5 text-sm"
+        )}
         disabled={disabled}
         onClick={() => {
           setOpen(!open);

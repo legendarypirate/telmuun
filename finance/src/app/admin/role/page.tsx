@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from "react";
 import { useRoles, usePermissions } from "@/hooks/use-lookups";
 import { toast } from "sonner";
-import { Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -15,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TableActions, TableEditButton } from "@/components/ui/table-actions";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 interface Role {
@@ -84,7 +84,7 @@ export default function RolePermissionPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Role</TableHead>
-              <TableHead>Actions</TableHead>
+              <TableHead>Үйлдэл</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -99,9 +99,12 @@ export default function RolePermissionPage() {
                 <TableRow key={record.id}>
                   <TableCell>{record.name}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="sm" onClick={() => openPermissionDrawer(record)}>
-                      <Edit className="h-4 w-4" /> Edit Permissions
-                    </Button>
+                    <TableActions>
+                      <TableEditButton
+                        onClick={() => openPermissionDrawer(record)}
+                        title="Edit Permissions"
+                      />
+                    </TableActions>
                   </TableCell>
                 </TableRow>
               ))

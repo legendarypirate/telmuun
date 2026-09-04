@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 interface Driver {
   id: number;
@@ -202,7 +203,6 @@ export default function DriversPage() {
   }
 
   const paged = bulks.slice((page - 1) * pageSize, page * pageSize);
-  const pageCount = Math.max(1, Math.ceil(bulks.length / pageSize));
 
   return (
     <div className="min-h-full">
@@ -307,11 +307,13 @@ export default function DriversPage() {
                     </TableBody>
                   </Table>
                 </div>
-                <div className="mt-3 flex items-center gap-2">
-                  <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Өмнөх</Button>
-                  <span className="text-sm">{page} / {pageCount}</span>
-                  <Button variant="outline" size="sm" disabled={page >= pageCount} onClick={() => setPage((p) => p + 1)}>Дараах</Button>
-                </div>
+                <TablePagination
+                  current={page}
+                  pageSize={pageSize}
+                  total={bulks.length}
+                  showPageSize={false}
+                  onPageChange={setPage}
+                />
               </>
             )}
           </div>

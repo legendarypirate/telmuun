@@ -14,7 +14,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
+import {
+  FilterBar,
+  FilterDate,
+  FilterField,
+  FilterInput,
+} from '@/components/ui/filter-bar';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { useQuery } from '@tanstack/react-query';
 import { useMerchants } from '@/hooks/use-lookups';
@@ -186,75 +191,74 @@ export default function ProductReportPage() {
       </div>
 
       {/* Filters Row */}
-      <div className="mb-6 flex flex-wrap items-center gap-4">
-        {/* Date Range */}
-        <div className="flex items-center gap-2">
-          <Input
-            type="date"
+      <FilterBar
+        actions={
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            <Button onClick={handleSubmit} disabled={loading} size="sm" className="h-8">
+              {loading ? 'Ачааллаж байна...' : 'Хайх'}
+            </Button>
+            <Button
+              onClick={exportToExcel}
+              disabled={loading || deliveriesWithItems.length === 0}
+              variant="outline"
+              size="sm"
+              className="h-8"
+            >
+              Excel татах
+            </Button>
+          </div>
+        }
+      >
+        <FilterField label="Эхлэх" className="w-36">
+          <FilterDate
             value={dayjs(dateRange[0]).format('YYYY-MM-DD')}
             onChange={(e) => {
               const date = e.target.value ? new Date(e.target.value) : new Date();
               setDateRange([date, dateRange[1]]);
             }}
-            className="w-40"
           />
-          <span className="text-gray-500">~</span>
-          <Input
-            type="date"
+        </FilterField>
+        <FilterField label="Дуусах" className="w-36">
+          <FilterDate
             value={dayjs(dateRange[1]).format('YYYY-MM-DD')}
             onChange={(e) => {
               const date = e.target.value ? new Date(e.target.value) : new Date();
               setDateRange([dateRange[0], date]);
             }}
-            className="w-40"
           />
-        </div>
-
-        {/* Merchant Filter - Hide for customers (role 2) */}
+        </FilterField>
         {!isCustomer && (
-          <SearchableSelect
-            options={[
-              { value: 'all', label: 'All Merchants' },
-              ...merchants.map((merchant) => ({
-                value: merchant.id.toString(),
-                label: merchant.username,
-              })),
-            ]}
-            value={selectedMerchantId?.toString() || 'all'}
-            onValueChange={(value) =>
-              setSelectedMerchantId(value === 'all' ? null : parseInt(value))
-            }
-            placeholder="Select Merchant"
-            className="w-48"
-          />
+          <FilterField label="Дэлгүүр" className="w-48">
+            <SearchableSelect
+              size="sm"
+              options={[
+                { value: 'all', label: 'Бүх дэлгүүр' },
+                ...merchants.map((merchant) => ({
+                  value: merchant.id.toString(),
+                  label: merchant.username,
+                })),
+              ]}
+              value={selectedMerchantId?.toString() || 'all'}
+              onValueChange={(value) =>
+                setSelectedMerchantId(value === 'all' ? null : parseInt(value))
+              }
+              placeholder="Дэлгүүр сонгох"
+              searchPlaceholder="Дэлгүүр хайх..."
+            />
+          </FilterField>
         )}
-
-        {/* Product Name Filter */}
-        <Input
-          type="text"
-          placeholder="Барааны нэрээр хайх..."
-          value={productNameFilter}
-          onChange={(e) => setProductNameFilter(e.target.value)}
-          className="w-48"
-        />
-
-        {/* Submit Button */}
-        <Button onClick={handleSubmit} disabled={loading}>
-          {loading ? 'Loading...' : 'Search'}
-        </Button>
-
-        {/* Export Button */}
-        <Button
-          onClick={exportToExcel}
-          disabled={loading || deliveriesWithItems.length === 0}
-          variant="outline"
-        >
-          Export to Excel
-        </Button>
-      </div>
+        <FilterField label="Бараа" className="w-48">
+          <FilterInput
+            icon="search"
+            placeholder="Барааны нэрээр хайх..."
+            value={productNameFilter}
+            onChange={(e) => setProductNameFilter(e.target.value)}
+          />
+        </FilterField>
+      </FilterBar>
 
       {/* Report Table */}
-      <div className="rounded-md border">
+      <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>
