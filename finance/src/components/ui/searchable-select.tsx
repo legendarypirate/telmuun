@@ -104,9 +104,7 @@ export function SearchableSelect({
                   )}
                   onClick={() => {
                     if (isDisabled) return;
-                    onValueChange?.(
-                      option.value === value ? "" : option.value
-                    );
+                    onValueChange?.(option.value);
                     setOpen(false);
                     setSearchQuery("");
                   }}

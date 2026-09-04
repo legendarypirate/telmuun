@@ -13,7 +13,7 @@ export default function AdminSectionLayout({
       <Sidebar />
       <div className="flex flex-1 flex-col">
         <Navbar />
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 px-3 py-3">{children}</main>
       </div>
     </div>
   );

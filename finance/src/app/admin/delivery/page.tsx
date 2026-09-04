@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   Table,
   TableBody,
@@ -595,9 +596,9 @@ export default function DeliveryPage() {
   const pageCount = Math.max(1, Math.ceil(pagination.total / pagination.pageSize));
 
   return (
-    <div className="px-6 pt-6 pb-32">
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Хүргэлт</h1>
+    <div className="pb-28">
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Хүргэлт</h1>
         <Button onClick={() => {
           setCreateForm((p) => ({ ...p, deliveryDate: getTodayLocal() }));
           setIsDrawerOpen(true);
@@ -606,24 +607,26 @@ export default function DeliveryPage() {
         </Button>
       </div>
 
-      <div className="mb-6 rounded-lg border bg-card p-4 flex flex-wrap items-center gap-3">
+      <div className="mb-3 rounded-lg border bg-card p-3 flex flex-wrap items-center gap-2">
         <Input
           placeholder="Утас"
           value={phoneFilter}
           onChange={(e) => setPhoneFilter(e.target.value)}
-          className="w-48"
+          className="w-40"
         />
-        <Input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPagination((p) => ({ ...p, current: 1 })); }} className="w-40" />
-        <Input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPagination((p) => ({ ...p, current: 1 })); }} className="w-40" />
-        <Select value={districtFilter} onValueChange={(v) => { setDistrictFilter(v); setPagination((p) => ({ ...p, current: 1 })); }}>
-          <SelectTrigger className="w-48"><SelectValue placeholder="Дүүрэг" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Бүх дүүрэг</SelectItem>
-            {DISTRICTS.map((d) => (
-              <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPagination((p) => ({ ...p, current: 1 })); }} className="w-36" />
+        <Input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPagination((p) => ({ ...p, current: 1 })); }} className="w-36" />
+        <SearchableSelect
+          className="w-44"
+          value={districtFilter}
+          onValueChange={(v) => { setDistrictFilter(v || "all"); setPagination((p) => ({ ...p, current: 1 })); }}
+          placeholder="Дүүрэг"
+          searchPlaceholder="Дүүрэг хайх..."
+          options={[
+            { value: "all", label: "Бүх дүүрэг" },
+            ...DISTRICTS.map((d) => ({ value: String(d.id), label: d.name })),
+          ]}
+        />
         {statusList.map((status) => (
           <button
             key={status.id}
@@ -636,20 +639,28 @@ export default function DeliveryPage() {
         ))}
         {!isMerchant && (
           <>
-            <Select value={driverFilter} onValueChange={(v) => { setDriverFilter(v); setPagination((p) => ({ ...p, current: 1 })); }}>
-              <SelectTrigger className="w-48"><SelectValue placeholder="Жолооч" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Бүх жолооч</SelectItem>
-                {drivers.map((d) => <SelectItem key={d.id} value={String(d.id)}>{d.username}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={merchantFilter} onValueChange={(v) => { setMerchantFilter(v); setPagination((p) => ({ ...p, current: 1 })); }}>
-              <SelectTrigger className="w-48"><SelectValue placeholder="Дэлгүүр" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Бүх дэлгүүр</SelectItem>
-                {merchants.map((m) => <SelectItem key={m.id} value={String(m.id)}>{m.username}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              className="w-44"
+              value={driverFilter}
+              onValueChange={(v) => { setDriverFilter(v || "all"); setPagination((p) => ({ ...p, current: 1 })); }}
+              placeholder="Жолооч"
+              searchPlaceholder="Жолооч хайх..."
+              options={[
+                { value: "all", label: "Бүх жолооч" },
+                ...drivers.map((d) => ({ value: String(d.id), label: d.username })),
+              ]}
+            />
+            <SearchableSelect
+              className="w-48"
+              value={merchantFilter}
+              onValueChange={(v) => { setMerchantFilter(v || "all"); setPagination((p) => ({ ...p, current: 1 })); }}
+              placeholder="Дэлгүүр"
+              searchPlaceholder="Дэлгүүр хайх..."
+              options={[
+                { value: "all", label: "Бүх дэлгүүр" },
+                ...merchants.map((m) => ({ value: String(m.id), label: m.username })),
+              ]}
+            />
           </>
         )}
         {canUseExcelImport && (
@@ -664,7 +675,7 @@ export default function DeliveryPage() {
       </div>
 
       <div className="border rounded-lg overflow-x-auto">
-        <Table className="[&_th]:px-3 [&_th]:py-3 [&_td]:px-3 [&_td]:py-3">
+        <Table className="[&_th]:px-2 [&_th]:py-2 [&_td]:px-2 [&_td]:py-2">
           <TableHeader>
             <TableRow>
               <TableHead className="w-10"><Checkbox checked={deliveryData.length > 0 && selectedRowKeys.length === deliveryData.length} onCheckedChange={toggleAll} /></TableHead>
@@ -826,31 +837,31 @@ export default function DeliveryPage() {
       )}
 
       <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-        <SheetContent className="overflow-y-auto sm:max-w-md px-6">
+        <SheetContent className="overflow-y-auto overflow-x-visible sm:max-w-md px-6">
           <SheetHeader className="px-0 pb-4"><SheetTitle>Хүргэлт үүсгэх</SheetTitle></SheetHeader>
           <div className="space-y-5 mt-2">
             {!isMerchant && (
               <div className="space-y-2">
                 <Label>Дэлгүүр</Label>
-                <Select value={createForm.merchantId} onValueChange={(v) => setCreateForm((p) => ({ ...p, merchantId: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Дэлгүүр сонгох" /></SelectTrigger>
-                  <SelectContent>
-                    {merchants.map((m) => <SelectItem key={m.id} value={String(m.id)}>{m.username}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={createForm.merchantId}
+                  onValueChange={(v) => setCreateForm((p) => ({ ...p, merchantId: v }))}
+                  placeholder="Дэлгүүр сонгох"
+                  searchPlaceholder="Дэлгүүр хайх..."
+                  options={merchants.map((m) => ({ value: String(m.id), label: m.username }))}
+                />
               </div>
             )}
             <div className="space-y-2"><Label>Утас</Label><Input value={createForm.phone} onChange={(e) => setCreateForm((p) => ({ ...p, phone: e.target.value }))} /></div>
             <div className="space-y-2">
               <Label>Дүүрэг</Label>
-              <Select value={createForm.districtId} onValueChange={(v) => setCreateForm((p) => ({ ...p, districtId: v }))}>
-                <SelectTrigger><SelectValue placeholder="Дүүрэг сонгох" /></SelectTrigger>
-                <SelectContent>
-                  {DISTRICTS.map((d) => (
-                    <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={createForm.districtId}
+                onValueChange={(v) => setCreateForm((p) => ({ ...p, districtId: v }))}
+                placeholder="Дүүрэг сонгох"
+                searchPlaceholder="Дүүрэг хайх..."
+                options={DISTRICTS.map((d) => ({ value: String(d.id), label: d.name }))}
+              />
             </div>
             <div className="space-y-2">
               <Label>Хүргэх огноо</Label>
@@ -866,12 +877,14 @@ export default function DeliveryPage() {
             {pullFromWarehouse && (
               <div className="space-y-2">
                 <div className="flex gap-2">
-                  <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                    <SelectTrigger><SelectValue placeholder="Бараа" /></SelectTrigger>
-                    <SelectContent>
-                      {products.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    className="flex-1"
+                    value={selectedProduct}
+                    onValueChange={setSelectedProduct}
+                    placeholder="Бараа"
+                    searchPlaceholder="Бараа хайх..."
+                    options={products.map((p) => ({ value: p.id, label: p.name }))}
+                  />
                   <Input type="number" className="w-20" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
                   <Button type="button" onClick={() => {
                     const product = products.find((p) => p.id === selectedProduct);
@@ -903,14 +916,13 @@ export default function DeliveryPage() {
             <div className="space-y-2"><Label>Утас</Label><Input value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} /></div>
             <div className="space-y-2">
               <Label>Дүүрэг</Label>
-              <Select value={editForm.districtId} onValueChange={(v) => setEditForm((p) => ({ ...p, districtId: v }))}>
-                <SelectTrigger><SelectValue placeholder="Дүүрэг сонгох" /></SelectTrigger>
-                <SelectContent>
-                  {DISTRICTS.map((d) => (
-                    <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={editForm.districtId}
+                onValueChange={(v) => setEditForm((p) => ({ ...p, districtId: v }))}
+                placeholder="Дүүрэг сонгох"
+                searchPlaceholder="Дүүрэг хайх..."
+                options={DISTRICTS.map((d) => ({ value: String(d.id), label: d.name }))}
+              />
             </div>
             <div className="space-y-2"><Label>Хаяг</Label><Input value={editForm.address} onChange={(e) => setEditForm((p) => ({ ...p, address: e.target.value }))} /></div>
             <div className="space-y-2">
@@ -958,12 +970,13 @@ export default function DeliveryPage() {
       <Dialog open={isAllocateOpen} onOpenChange={setIsAllocateOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Жолооч сонгох</DialogTitle></DialogHeader>
-          <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
-            <SelectTrigger><SelectValue placeholder="Жолооч" /></SelectTrigger>
-            <SelectContent>
-              {drivers.map((d) => <SelectItem key={d.id} value={String(d.id)}>{d.username}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={selectedDriverId}
+            onValueChange={setSelectedDriverId}
+            placeholder="Жолооч"
+            searchPlaceholder="Жолооч хайх..."
+            options={drivers.map((d) => ({ value: String(d.id), label: d.username }))}
+          />
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAllocateOpen(false)}>Цуцлах</Button>
             <Button onClick={handleAllocate}>Хадгалах</Button>
@@ -974,12 +987,13 @@ export default function DeliveryPage() {
       <Dialog open={isStatusOpen} onOpenChange={setIsStatusOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Төлөв сонгох</DialogTitle></DialogHeader>
-          <Select value={selectStatusId} onValueChange={setSelectedStatusId}>
-            <SelectTrigger><SelectValue placeholder="Төлөв" /></SelectTrigger>
-            <SelectContent>
-              {statusOptions.map((s) => <SelectItem key={s.id} value={String(s.id)}>{s.status}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={selectStatusId}
+            onValueChange={setSelectedStatusId}
+            placeholder="Төлөв"
+            searchPlaceholder="Төлөв хайх..."
+            options={statusOptions.map((s) => ({ value: String(s.id), label: s.status }))}
+          />
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsStatusOpen(false)}>Цуцлах</Button>
             <Button onClick={handleStatusChange}>Хадгалах</Button>
