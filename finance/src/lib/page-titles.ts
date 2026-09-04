@@ -13,6 +13,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/admin/report/driver": "Жолоочийн тайлан",
   "/admin/log": "Үйлдлийн лог",
   "/admin/user": "Харилцагч нар",
+  "/admin/user-driver": "Жолооч",
   "/admin/status": "Хүргэлтийн төлөвүүд",
   "/admin/role": "Эрхийн зохицуулалт",
   "/admin/warehouse": "Агуулах бүртгэх",

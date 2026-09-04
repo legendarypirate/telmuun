@@ -38,6 +38,11 @@ module.exports = (sequelize, Sequelize) => {
       email: {
         type: Sequelize.STRING
       },
+      report_price: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+        defaultValue: 7000,
+      },
     });
     return User;
   };

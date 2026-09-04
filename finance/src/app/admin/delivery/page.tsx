@@ -244,6 +244,120 @@ export default function DeliveryPage() {
     return data.success && Array.isArray(data.data) ? data.data : [];
   };
 
+  const handlePrint = async () => {
+    if (selectedRowKeys.length === 0) return;
+
+    try {
+      const selectedRows = deliveryData.filter((item) => selectedRowKeys.includes(item.id));
+      const allItems = { ...expandedItems };
+      const missingIds = selectedRowKeys.filter((id) => !allItems[id]);
+      if (missingIds.length > 0) {
+        const results = await Promise.all(missingIds.map((id) => fetchItems(id)));
+        missingIds.forEach((id, index) => {
+          allItems[id] = results[index];
+        });
+        setExpandedItems((prev) => ({ ...prev, ...Object.fromEntries(missingIds.map((id, i) => [id, results[i]])) }));
+      }
+
+      const rowsWithItems = selectedRows.map((row) => ({
+        ...row,
+        items: allItems[row.id] || [],
+      }));
+
+      const uniqueDrivers = [
+        ...new Set(rowsWithItems.map((row) => row.driver?.username).filter(Boolean)),
+      ].join(", ");
+
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) {
+        toast.error("Хэвлэх цонх нээгдсэнгүй. Popup-ыг зөвшөөрнө үү.");
+        return;
+      }
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Print</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 0; padding: 20px; font-size: 18px; }
+              .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; font-size: 20px; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 16px; }
+              th, td { border: 1px solid #ccc; padding: 10px 12px; text-align: left; word-break: break-word; }
+              th { background-color: #f5f5f5; font-weight: bold; font-size: 18px; }
+              @page { size: A4 portrait; margin: 10mm; }
+            </style>
+          </head>
+          <body>
+            <div class="header" style="display: flex; justify-content: space-between; align-items: flex-start;">
+              ${uniqueDrivers ? `<div style="flex: 1; text-align: left; font-size: 18px;"><div style="font-weight: bold;">Жолооч:</div><div>${uniqueDrivers}</div></div>` : ""}
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>№</th>
+                  <th>Дэлгүүр</th>
+                  <th>Барааны нэр</th>
+                  <th>Тоо</th>
+                  <th>Нийт үнэ</th>
+                  <th>Утас</th>
+                  <th>Дэлгэрэнгүй хаяг</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsWithItems
+                  .map((row, rowIndex) => {
+                    const items = row.items || [];
+                    const rowNumber = rowIndex + 1;
+                    if (items.length === 0) {
+                      return `
+                        <tr>
+                          <td>${rowNumber}</td>
+                          <td>${row.merchant?.username ?? "-"}</td>
+                          <td>-</td>
+                          <td>-</td>
+                          <td>${Number(row.price || 0).toLocaleString()}₮</td>
+                          <td>${row.phone}</td>
+                          <td>${row.address}</td>
+                        </tr>
+                      `;
+                    }
+                    return items
+                      .map(
+                        (item, index) => `
+                        <tr>
+                          ${index === 0 ? `
+                            <td rowspan="${items.length}">${rowNumber}</td>
+                            <td rowspan="${items.length}">${row.merchant?.username ?? "-"}</td>
+                          ` : ""}
+                          <td>${item.good?.name || "Unknown"}</td>
+                          <td>${item.quantity}</td>
+                          ${index === 0 ? `
+                            <td rowspan="${items.length}">${Number(row.price || 0).toLocaleString()}₮</td>
+                            <td rowspan="${items.length}">${row.phone}</td>
+                            <td rowspan="${items.length}">${row.address}</td>
+                          ` : ""}
+                        </tr>
+                      `
+                      )
+                      .join("");
+                  })
+                  .join("")}
+              </tbody>
+            </table>
+            <div style="margin-top: 20px; text-align: right; font-size: 18px; font-weight: bold;">
+              Нийт: ${rowsWithItems.length} хүргэлт
+            </div>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
+    } catch (error) {
+      console.error(error);
+      toast.error("Хэвлэхэд алдаа гарлаа");
+    }
+  };
+
   const handleExpand = async (id: number) => {
     if (expandedId === id) {
       setExpandedId(null);
@@ -595,6 +709,7 @@ export default function DeliveryPage() {
       {selectedRowKeys.length > 0 && (
         <div className="fixed bottom-0 left-64 right-0 border-t bg-background p-4 flex flex-wrap items-center gap-3">
           <span className="text-sm font-medium">{selectedRowKeys.length} сонгосон · {selectedTotal.toLocaleString()} ₮</span>
+          <Button variant="outline" onClick={handlePrint}>Хэвлэх</Button>
           {hasPermission("delivery:excel_import_delivery") && (
             <>
               <Button onClick={() => setIsAllocateOpen(true)}>Жолоочид хуваарилах</Button>

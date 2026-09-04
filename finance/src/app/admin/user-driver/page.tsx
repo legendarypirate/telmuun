@@ -32,12 +32,11 @@ interface User {
   email: string;
   phone: string;
   role_id: number;
-  report_price?: number;
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
-export default function UsersPage() {
+export default function DriverUsersPage() {
   const queryClient = useQueryClient();
   const { data: users = [], isFetching: loading } = useUsers();
   const [searchText, setSearchText] = useState("");
@@ -51,15 +50,14 @@ export default function UsersPage() {
     email: "",
     phone: "",
     password: "",
-    report_price: "7000",
   });
   const [newPassword, setNewPassword] = useState("");
 
-  const customers = useMemo(
+  const drivers = useMemo(
     () =>
       (users as User[]).filter(
         (user) =>
-          user.role_id === 2 &&
+          user.role_id === 3 &&
           (user.username || "").toLowerCase().includes(searchText.toLowerCase())
       ),
     [users, searchText]
@@ -68,12 +66,12 @@ export default function UsersPage() {
   const fetchData = () => queryClient.invalidateQueries({ queryKey: queryKeys.users });
 
   useEffect(() => {
-    document.title = "Харилцагч нар";
+    document.title = "Жолооч";
   }, []);
 
   const openCreate = () => {
     setEditingUser(null);
-    setForm({ username: "", email: "", phone: "", password: "", report_price: "7000" });
+    setForm({ username: "", email: "", phone: "", password: "" });
     setDrawerVisible(true);
   };
 
@@ -84,7 +82,6 @@ export default function UsersPage() {
       email: user.email || "",
       phone: user.phone || "",
       password: "",
-      report_price: String(user.report_price || 7000),
     });
     setDrawerVisible(true);
   };
@@ -92,7 +89,7 @@ export default function UsersPage() {
   const handleDrawerClose = () => {
     setDrawerVisible(false);
     setEditingUser(null);
-    setForm({ username: "", email: "", phone: "", password: "", report_price: "7000" });
+    setForm({ username: "", email: "", phone: "", password: "" });
   };
 
   const handleFormSubmit = async () => {
@@ -105,12 +102,11 @@ export default function UsersPage() {
             username: form.username,
             email: form.email,
             phone: form.phone,
-            report_price: Number(form.report_price) || 7000,
           }),
         });
         const result = await response.json();
         if (response.ok && result.success !== false) {
-          toast.success("Харилцагч амжилттай шинэчлэгдлээ");
+          toast.success("Жолооч амжилттай шинэчлэгдлээ");
           fetchData();
           handleDrawerClose();
         } else {
@@ -126,14 +122,13 @@ export default function UsersPage() {
           username: form.username,
           email: form.email,
           phone: form.phone,
-          role_id: 2,
+          role_id: 3,
           password: form.password,
-          report_price: Number(form.report_price) || 7000,
         }),
       });
       const result = await response.json();
       if (response.ok && result.success) {
-        toast.success("Харилцагч амжилттай үүслээ");
+        toast.success("Жолооч амжилттай үүслээ");
         fetchData();
         handleDrawerClose();
       } else {
@@ -186,12 +181,12 @@ export default function UsersPage() {
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Харилцагч нар</h1>
-        <Button onClick={openCreate}>+ Харилцагч үүсгэх</Button>
+        <h1 className="text-3xl font-bold">Жолооч</h1>
+        <Button onClick={openCreate}>+ Жолооч үүсгэх</Button>
       </div>
 
       <div className="mb-4 flex items-center gap-4">
-        <div className="text-sm text-muted-foreground">Нийт: {customers.length}</div>
+        <div className="text-sm text-muted-foreground">Нийт: {drivers.length}</div>
         <Input
           placeholder="Нэрээр хайх..."
           value={searchText}
@@ -207,30 +202,28 @@ export default function UsersPage() {
               <TableHead>Нэр</TableHead>
               <TableHead>Имэйл</TableHead>
               <TableHead>Утас</TableHead>
-              <TableHead>Report Price</TableHead>
               <TableHead>Үйлдэл</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
                   Ачааллаж байна...
                 </TableCell>
               </TableRow>
-            ) : customers.length === 0 ? (
+            ) : drivers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                  Харилцагч олдсонгүй
+                <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                  Жолооч олдсонгүй
                 </TableCell>
               </TableRow>
             ) : (
-              customers.map((record) => (
+              drivers.map((record) => (
                 <TableRow key={record.id}>
                   <TableCell>{record.username}</TableCell>
                   <TableCell>{record.email}</TableCell>
                   <TableCell>{record.phone}</TableCell>
-                  <TableCell>{Number(record.report_price || 7000).toLocaleString()} ₮</TableCell>
                   <TableCell className="flex gap-1">
                     <Button variant="ghost" size="sm" onClick={() => openEdit(record)}>
                       <Pencil className="h-4 w-4" />
@@ -267,7 +260,7 @@ export default function UsersPage() {
       <Sheet open={drawerVisible} onOpenChange={(open) => (open ? setDrawerVisible(true) : handleDrawerClose())}>
         <SheetContent>
           <SheetHeader>
-            <SheetTitle>{editingUser ? "Харилцагч засах" : "Харилцагч үүсгэх"}</SheetTitle>
+            <SheetTitle>{editingUser ? "Жолооч засах" : "Жолооч үүсгэх"}</SheetTitle>
           </SheetHeader>
           <div className="mt-4 space-y-3">
             <div className="space-y-2">
@@ -281,14 +274,6 @@ export default function UsersPage() {
             <div className="space-y-2">
               <Label>Утас</Label>
               <Input value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} />
-            </div>
-            <div className="space-y-2">
-              <Label>Report Price</Label>
-              <Input
-                type="number"
-                value={form.report_price}
-                onChange={(e) => setForm((p) => ({ ...p, report_price: e.target.value }))}
-              />
             </div>
             {!editingUser && (
               <div className="space-y-2">

@@ -687,7 +687,7 @@ exports.findAll = async (req, res) => {
         limit: safeLimit,
         offset,
         include: [
-          { model: User, as: 'merchant', attributes: ['id', 'username'] },
+          { model: User, as: 'merchant', attributes: ['id', 'username', 'report_price'] },
           { model: Status, as: 'status_name', attributes: ['status', 'color'] },
           { model: User, as: 'driver', attributes: ['username'] },
         ],
@@ -1060,7 +1060,7 @@ exports.findAllForProductReport = async (req, res) => {
     const deliveries = await Delivery.findAll({
       where,
       include: [
-        { model: User, as: "merchant", attributes: ["id", "username"] },
+        { model: User, as: "merchant", attributes: ["id", "username", "report_price"] },
         {
           model: DeliveryItem,
           as: "items",

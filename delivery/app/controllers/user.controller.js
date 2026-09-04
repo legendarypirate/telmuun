@@ -27,7 +27,8 @@ exports.create = async (req, res) => {
       status: 2, // user is pending approval
       address: req.body.address,
       role_id: req.body.role_id,
-      password: hashedPassword
+      password: hashedPassword,
+      report_price: req.body.report_price != null ? Number(req.body.report_price) : 7000,
     };
 
     // Save User in the database
@@ -208,13 +209,15 @@ exports.update = async (req, res) => {
   const id = req.params.id;
 
   try {
-    // Only allow updating these fields
-    const { account_number, address, phone, password } = req.body;
+    const { account_number, address, phone, password, email, username, report_price } = req.body;
 
     const updateData = {};
     if (account_number !== undefined) updateData.account_number = account_number;
     if (address !== undefined) updateData.address = address;
     if (phone !== undefined) updateData.phone = phone;
+    if (email !== undefined) updateData.email = email;
+    if (username !== undefined) updateData.username = username;
+    if (report_price !== undefined) updateData.report_price = Number(report_price) || 7000;
 
     // If password is provided, hash it
     if (password !== undefined) {
@@ -225,9 +228,10 @@ exports.update = async (req, res) => {
     const [num] = await User.update(updateData, { where: { id } });
 
     if (num === 1) {
-      res.send({ message: "User was updated successfully." });
+      res.send({ success: true, message: "User was updated successfully." });
     } else {
       res.send({
+        success: false,
         message: `Cannot update User with id=${id}. Maybe User was not found or no fields were provided!`
       });
     }

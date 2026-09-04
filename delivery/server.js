@@ -28,7 +28,14 @@ const db = require("./app/models");
 
 // Sync database and handle any errors
 db.sequelize.sync()
-  .then(() => {
+  .then(async () => {
+    try {
+      await db.sequelize.query(
+        'ALTER TABLE users ADD COLUMN IF NOT EXISTS report_price INTEGER DEFAULT 7000'
+      );
+    } catch (err) {
+      console.log("report_price column check:", err.message);
+    }
     console.log("Synced db.");
   })
   .catch((err) => {
