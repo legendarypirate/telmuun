@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ShoppingCart, PackagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,6 +61,66 @@ const DISTRICTS = [
 function districtName(id?: number | null) {
   if (id == null) return "-";
   return DISTRICTS.find((d) => d.id === Number(id))?.name || "-";
+}
+
+type CreateDeliveryPayload = {
+  merchant_id: number;
+  phone: string;
+  address: string;
+  status: number;
+  price: number;
+  comment: string;
+  district_id: number;
+  delivery_date: string;
+  items: Array<{ good_id: string; quantity: number }>;
+};
+
+type CartDraft = {
+  id: string;
+  payload: CreateDeliveryPayload;
+  display: {
+    merchantName: string;
+    phone: string;
+    address: string;
+    price: number;
+    districtName: string;
+    itemCount: number;
+  };
+};
+
+const DELIVERY_CART_STORAGE_KEY = "admin-delivery-create-cart";
+
+function getCartStorageKey(scopeId: string | number) {
+  return `${DELIVERY_CART_STORAGE_KEY}:${scopeId}`;
+}
+
+function loadCartFromStorage(scopeId: string | number): CartDraft[] {
+  try {
+    const raw = localStorage.getItem(getCartStorageKey(scopeId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCartToStorage(cart: CartDraft[], scopeId: string | number) {
+  try {
+    const key = getCartStorageKey(scopeId);
+    if (cart.length === 0) localStorage.removeItem(key);
+    else localStorage.setItem(key, JSON.stringify(cart));
+  } catch {
+    /* ignore */
+  }
+}
+
+function clearCartStorage(scopeId: string | number) {
+  try {
+    localStorage.removeItem(getCartStorageKey(scopeId));
+  } catch {
+    /* ignore */
+  }
 }
 
 interface Item {
@@ -160,16 +220,39 @@ export default function DeliveryPage() {
   const [selectedProduct, setSelectedProduct] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [productPrice, setProductPrice] = useState(0);
+  const [createCart, setCreateCart] = useState<CartDraft[]>([]);
+  const [cartHydrated, setCartHydrated] = useState(false);
+  const [isCreatingBulk, setIsCreatingBulk] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const userData = typeof window !== "undefined" ? localStorage.getItem("user") : null;
   const user = userData ? JSON.parse(userData) : null;
   const isMerchant = user?.role === 2;
   const username = typeof window !== "undefined" ? localStorage.getItem("username") : null;
+  const cartScopeId = isMerchant && user?.id ? user.id : "admin";
   const canUseExcelImport =
     permissions.includes("delivery:excel_import_delivery") ||
     username === "Nippon clean tech home care LLC" ||
     username === "admin";
+
+  useEffect(() => {
+    setCreateCart(loadCartFromStorage(cartScopeId));
+    setCartHydrated(true);
+  }, [cartScopeId]);
+
+  useEffect(() => {
+    if (!cartHydrated) return;
+    saveCartToStorage(createCart, cartScopeId);
+  }, [createCart, cartScopeId, cartHydrated]);
+
+  useEffect(() => {
+    if (!isDrawerOpen || !cartHydrated) return;
+    const saved = loadCartFromStorage(cartScopeId);
+    setCreateCart(saved);
+    if (saved.length > 0) {
+      toast.message(`Сагсанд ${saved.length} хүргэлт хадгалагдсан байна`);
+    }
+  }, [isDrawerOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -281,23 +364,8 @@ export default function DeliveryPage() {
 
     try {
       const selectedRows = deliveryData.filter((item) => selectedRowKeys.includes(item.id));
-      const allItems = { ...expandedItems };
-      const missingIds = selectedRowKeys.filter((id) => !allItems[id]);
-      if (missingIds.length > 0) {
-        const results = await Promise.all(missingIds.map((id) => fetchItems(id)));
-        missingIds.forEach((id, index) => {
-          allItems[id] = results[index];
-        });
-        setExpandedItems((prev) => ({ ...prev, ...Object.fromEntries(missingIds.map((id, i) => [id, results[i]])) }));
-      }
-
-      const rowsWithItems = selectedRows.map((row) => ({
-        ...row,
-        items: allItems[row.id] || [],
-      }));
-
       const uniqueDrivers = [
-        ...new Set(rowsWithItems.map((row) => row.driver?.username).filter(Boolean)),
+        ...new Set(selectedRows.map((row) => row.driver?.username).filter(Boolean)),
       ].join(", ");
 
       const printWindow = window.open("", "_blank");
@@ -314,9 +382,10 @@ export default function DeliveryPage() {
               body { font-family: Arial, sans-serif; margin: 0; padding: 20px; font-size: 18px; }
               .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; font-size: 20px; }
               table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 16px; table-layout: fixed; }
-              th, td { border: 1px solid #ccc; padding: 10px 12px; text-align: left; word-break: break-word; }
+              th, td { border: 1px solid #ccc; padding: 10px 12px; text-align: left; word-break: break-word; vertical-align: top; }
               th { background-color: #f5f5f5; font-weight: bold; font-size: 18px; }
-              .addr { width: 28%; max-width: 28%; }
+              .addr { width: 24%; }
+              .comment { width: 18%; }
               @page { size: A4 portrait; margin: 10mm; }
             </style>
           </head>
@@ -329,56 +398,33 @@ export default function DeliveryPage() {
                 <tr>
                   <th>№</th>
                   <th>Дэлгүүр</th>
-                  <th>Барааны нэр</th>
-                  <th>Тоо</th>
-                  <th>Нийт үнэ</th>
                   <th>Утас</th>
-                  <th class="addr">Дэлгэрэнгүй хаяг</th>
+                  <th>Үнэ</th>
+                  <th class="addr">Хаяг</th>
+                  <th class="comment">Тайлбар</th>
+                  <th>Шивсэн огноо</th>
                 </tr>
               </thead>
               <tbody>
-                ${rowsWithItems
-                  .map((row, rowIndex) => {
-                    const items = row.items || [];
-                    const rowNumber = rowIndex + 1;
-                    if (items.length === 0) {
-                      return `
-                        <tr>
-                          <td>${rowNumber}</td>
-                          <td>${row.merchant?.username ?? "-"}</td>
-                          <td>-</td>
-                          <td>-</td>
-                          <td>${Number(row.price || 0).toLocaleString()}₮</td>
-                          <td>${row.phone}</td>
-                          <td class="addr">${row.address}</td>
-                        </tr>
-                      `;
-                    }
-                    return items
-                      .map(
-                        (item, index) => `
-                        <tr>
-                          ${index === 0 ? `
-                            <td rowspan="${items.length}">${rowNumber}</td>
-                            <td rowspan="${items.length}">${row.merchant?.username ?? "-"}</td>
-                          ` : ""}
-                          <td>${item.good?.name || "Unknown"}</td>
-                          <td>${item.quantity}</td>
-                          ${index === 0 ? `
-                            <td rowspan="${items.length}">${Number(row.price || 0).toLocaleString()}₮</td>
-                            <td rowspan="${items.length}">${row.phone}</td>
-                            <td class="addr" rowspan="${items.length}">${row.address}</td>
-                          ` : ""}
-                        </tr>
-                      `
-                      )
-                      .join("");
-                  })
+                ${selectedRows
+                  .map(
+                    (row, rowIndex) => `
+                      <tr>
+                        <td>${rowIndex + 1}</td>
+                        <td>${row.merchant?.username ?? "-"}</td>
+                        <td>${row.phone ?? "-"}</td>
+                        <td>${Number(row.price || 0).toLocaleString()}₮</td>
+                        <td class="addr">${row.address ?? "-"}</td>
+                        <td class="comment">${row.comment || "-"}</td>
+                        <td>${dayjs(row.createdAt).format("YYYY-MM-DD HH:mm")}</td>
+                      </tr>
+                    `
+                  )
                   .join("")}
               </tbody>
             </table>
             <div style="margin-top: 20px; text-align: right; font-size: 18px; font-weight: bold;">
-              Нийт: ${rowsWithItems.length} хүргэлт
+              Нийт: ${selectedRows.length} хүргэлт
             </div>
           </body>
         </html>
@@ -403,17 +449,12 @@ export default function DeliveryPage() {
     }
   };
 
-  const handleCreate = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      toast.error("Токен олдсонгүй. Та дахин нэвтэрнэ үү.");
-      return;
-    }
+  const buildCreatePayload = (): CreateDeliveryPayload | null => {
     if (!createForm.phone || !createForm.address || !createForm.districtId || (!isMerchant && !createForm.merchantId)) {
       toast.error("Формыг шалгана уу. Дүүрэг сонгоно уу.");
-      return;
+      return null;
     }
-    const payload = {
+    return {
       merchant_id: isMerchant ? user.id : Number(createForm.merchantId),
       phone: createForm.phone,
       address: createForm.address,
@@ -424,28 +465,95 @@ export default function DeliveryPage() {
       delivery_date: createForm.deliveryDate || getTodayLocal(),
       items: productList.map((item) => ({ good_id: item.productId, quantity: item.quantity })),
     };
+  };
+
+  const resetEntryFields = () => {
+    setCreateForm((prev) => ({
+      merchantId: prev.merchantId,
+      phone: "",
+      address: "",
+      price: "",
+      comment: "",
+      districtId: prev.districtId,
+      deliveryDate: prev.deliveryDate || getTodayLocal(),
+    }));
+    setProductList([]);
+    setSelectedProduct("");
+    setQuantity(1);
+    setProductPrice(0);
+  };
+
+  const postDelivery = async (payload: CreateDeliveryPayload) => {
+    const token = localStorage.getItem("token");
+    if (!token) throw new Error("Токен олдсонгүй. Та дахин нэвтэрнэ үү.");
     const res = await fetch(`${API}/api/delivery`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify(payload),
     });
     const result = await res.json();
-    if (result.success) {
+    if (!result.success) throw new Error(result.message || "Хадгалахад алдаа гарлаа");
+    return result;
+  };
+
+  const handleAddToCart = () => {
+    const payload = buildCreatePayload();
+    if (!payload) return;
+    const merchantName = isMerchant
+      ? username || "Дэлгүүр"
+      : merchants.find((m) => String(m.id) === createForm.merchantId)?.username || "Дэлгүүр";
+    const draft: CartDraft = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      payload,
+      display: {
+        merchantName,
+        phone: payload.phone,
+        address: payload.address,
+        price: payload.price,
+        districtName: districtName(payload.district_id),
+        itemCount: payload.items.length,
+      },
+    };
+    setCreateCart((prev) => [...prev, draft]);
+    resetEntryFields();
+    toast.success(`Сагсанд нэмэгдлээ (${createCart.length + 1})`);
+  };
+
+  const handleCreate = async () => {
+    if (isCreatingBulk) return;
+    const payload = buildCreatePayload();
+    if (!payload) return;
+    try {
+      await postDelivery(payload);
       toast.success("Амжилттай бүртгэгдлээ");
       setIsDrawerOpen(false);
-      setCreateForm((prev) => ({
-        merchantId: prev.merchantId,
-        phone: "",
-        address: "",
-        price: "",
-        comment: "",
-        districtId: "",
-        deliveryDate: getTodayLocal(),
-      }));
-      setProductList([]);
+      resetEntryFields();
       setRefreshKey((k) => k + 1);
-    } else {
-      toast.error(result.message || "Хадгалахад алдаа гарлаа");
+    } catch (error: any) {
+      toast.error(error?.message || "Хадгалахад алдаа гарлаа");
+    }
+  };
+
+  const handleCreateCart = async () => {
+    if (createCart.length === 0 || isCreatingBulk) return;
+    setIsCreatingBulk(true);
+    try {
+      let successCount = 0;
+      for (const draft of createCart) {
+        await postDelivery(draft.payload);
+        successCount += 1;
+      }
+      toast.success(`${successCount} хүргэлт амжилттай бүртгэгдлээ`);
+      setCreateCart([]);
+      clearCartStorage(cartScopeId);
+      setIsDrawerOpen(false);
+      resetEntryFields();
+      setRefreshKey((k) => k + 1);
+    } catch (error: any) {
+      toast.error(error?.message || "Сагсан дахь хүргэлтүүдийг үүсгэхэд алдаа гарлаа");
+      setRefreshKey((k) => k + 1);
+    } finally {
+      setIsCreatingBulk(false);
     }
   };
 
@@ -931,13 +1039,72 @@ export default function DeliveryPage() {
       )}
 
       <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-        <SheetContent className="overflow-y-auto overflow-x-visible sm:max-w-md px-6">
-          <SheetHeader className="px-0 pb-4"><SheetTitle>Хүргэлт үүсгэх</SheetTitle></SheetHeader>
+        <SheetContent className="overflow-y-auto overflow-x-visible sm:max-w-md px-6 flex flex-col">
+          <SheetHeader className="px-0 pb-2">
+            <SheetTitle>Хүргэлт үүсгэх</SheetTitle>
+            <p className="text-xs text-muted-foreground">
+              Ганцаар үүсгэх эсвэл сагсанд овоолж бөөнөөр үүсгэх
+            </p>
+          </SheetHeader>
+
+          {createCart.length > 0 && (
+            <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50/80 p-3 space-y-2 shrink-0">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-emerald-900">
+                  <ShoppingCart className="h-4 w-4" />
+                  Сагс ({createCart.length})
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="bg-emerald-700 hover:bg-emerald-800"
+                  disabled={isCreatingBulk}
+                  onClick={() => void handleCreateCart()}
+                >
+                  {isCreatingBulk ? "Үүсгэж байна..." : `${createCart.length} хүргэлт үүсгэх`}
+                </Button>
+              </div>
+              <div className="max-h-40 overflow-y-auto space-y-2">
+                {createCart.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="flex items-start justify-between gap-2 rounded-md border border-emerald-200 bg-white px-3 py-2"
+                  >
+                    <div className="min-w-0 text-sm">
+                      <div className="font-medium truncate">
+                        #{index + 1} · {item.display.phone}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {item.display.address}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {item.display.merchantName} · {item.display.districtName} ·{" "}
+                        {item.display.price.toLocaleString()} ₮
+                        {item.display.itemCount > 0 ? ` · ${item.display.itemCount} бараа` : ""}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 text-destructive"
+                      disabled={isCreatingBulk}
+                      onClick={() => setCreateCart((prev) => prev.filter((x) => x.id !== item.id))}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <form
-            className="space-y-5 mt-2"
+            className="space-y-5 mt-2 flex-1"
             onSubmit={(e) => {
               e.preventDefault();
-              void handleCreate();
+              if (createCart.length > 0) void handleCreateCart();
+              else void handleCreate();
             }}
           >
             {!isMerchant && (
@@ -1028,7 +1195,34 @@ export default function DeliveryPage() {
                 ))}
               </div>
             )}
-            <Button type="submit" className="w-full">Үүсгэх</Button>
+            <div className="sticky bottom-0 -mx-1 pt-3 pb-1 space-y-2 border-t bg-background">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-emerald-700 text-emerald-800 hover:bg-emerald-50"
+                onClick={handleAddToCart}
+                disabled={isCreatingBulk}
+              >
+                <PackagePlus className="h-4 w-4" />
+                Сагсанд нэмэх
+              </Button>
+              {createCart.length === 0 ? (
+                <Button type="submit" className="w-full" disabled={isCreatingBulk}>
+                  Үүсгэх
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  className="w-full bg-emerald-700 hover:bg-emerald-800"
+                  disabled={isCreatingBulk}
+                  onClick={() => void handleCreateCart()}
+                >
+                  {isCreatingBulk
+                    ? "Үүсгэж байна..."
+                    : `Хадгалсан ${createCart.length} хүргэлтийг үүсгэх`}
+                </Button>
+              )}
+            </div>
           </form>
         </SheetContent>
       </Sheet>
