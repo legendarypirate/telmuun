@@ -614,7 +614,7 @@ exports.updateDeliveryDates = async (req, res) => {
 };
 
  exports.allocateDeliveries = async (req, res) => {
-    const { driver_id, delivery_ids, delivery_date } = req.body;
+    const { driver_id, delivery_ids } = req.body;
   
     if (!driver_id || !Array.isArray(delivery_ids) || delivery_ids.length === 0) {
       return res.status(400).json({
@@ -624,15 +624,11 @@ exports.updateDeliveryDates = async (req, res) => {
     }
   
     try {
-      // Use the provided delivery date or default to today
-      const newCreatedAt = delivery_date ? new Date(delivery_date) : new Date();
-      
-      // Bulk update the deliveries
+      // Bulk update the deliveries — do not touch createdAt (Шивсэн огноо).
       await Delivery.update(
         {
           driver_id,     // Assign the driver ID
           status: 2,     // Set the status to 2 (or any value that represents the allocated state)
-          createdAt: newCreatedAt, // Update the creation date
         },
         {
           where: {
@@ -646,7 +642,6 @@ exports.updateDeliveryDates = async (req, res) => {
         message: "Deliveries allocated and status updated successfully.",
         data: {
           allocated_count: delivery_ids.length,
-          delivery_date: newCreatedAt
         }
       });
     } catch (error) {
