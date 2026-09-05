@@ -381,12 +381,17 @@ export default function DeliveryPage() {
             <style>
               body { font-family: Arial, sans-serif; margin: 0; padding: 20px; font-size: 18px; }
               .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; font-size: 20px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 16px; table-layout: fixed; }
-              th, td { border: 1px solid #ccc; padding: 10px 12px; text-align: left; word-break: break-word; vertical-align: top; }
-              th { background-color: #f5f5f5; font-weight: bold; font-size: 18px; }
-              .addr { width: 24%; }
-              .comment { width: 18%; }
-              @page { size: A4 portrait; margin: 10mm; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 15px; table-layout: fixed; }
+              th, td { border: 1px solid #ccc; padding: 8px 10px; text-align: left; vertical-align: top; }
+              th { background-color: #f5f5f5; font-weight: bold; font-size: 15px; }
+              .num { width: 4%; white-space: nowrap; }
+              .merchant { width: 14%; word-break: break-word; }
+              .phone { width: 12%; white-space: nowrap; }
+              .price { width: 11%; white-space: nowrap; }
+              .addr { width: 28%; word-break: break-word; }
+              .comment { width: 16%; word-break: break-word; }
+              .created { width: 15%; white-space: nowrap; }
+              @page { size: A4 landscape; margin: 8mm; }
             </style>
           </head>
           <body>
@@ -396,13 +401,13 @@ export default function DeliveryPage() {
             <table>
               <thead>
                 <tr>
-                  <th>№</th>
-                  <th>Дэлгүүр</th>
-                  <th>Утас</th>
-                  <th>Үнэ</th>
+                  <th class="num">№</th>
+                  <th class="merchant">Дэлгүүр</th>
+                  <th class="phone">Утас</th>
+                  <th class="price">Үнэ</th>
                   <th class="addr">Хаяг</th>
                   <th class="comment">Тайлбар</th>
-                  <th>Шивсэн огноо</th>
+                  <th class="created">Шивсэн огноо</th>
                 </tr>
               </thead>
               <tbody>
@@ -410,13 +415,13 @@ export default function DeliveryPage() {
                   .map(
                     (row, rowIndex) => `
                       <tr>
-                        <td>${rowIndex + 1}</td>
-                        <td>${row.merchant?.username ?? "-"}</td>
-                        <td>${row.phone ?? "-"}</td>
-                        <td>${Number(row.price || 0).toLocaleString()}₮</td>
+                        <td class="num">${rowIndex + 1}</td>
+                        <td class="merchant">${row.merchant?.username ?? "-"}</td>
+                        <td class="phone">${row.phone ?? "-"}</td>
+                        <td class="price">${Number(row.price || 0).toLocaleString()}₮</td>
                         <td class="addr">${row.address ?? "-"}</td>
                         <td class="comment">${row.comment || "-"}</td>
-                        <td>${dayjs(row.createdAt).format("YYYY-MM-DD HH:mm")}</td>
+                        <td class="created">${dayjs(row.createdAt).format("YYYY-MM-DD HH:mm")}</td>
                       </tr>
                     `
                   )
