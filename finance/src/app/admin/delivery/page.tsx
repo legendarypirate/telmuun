@@ -12,6 +12,13 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   FilterBar,
   FilterChip,
   FilterClearButton,
@@ -433,7 +440,15 @@ export default function DeliveryPage() {
     if (result.success) {
       toast.success("Амжилттай бүртгэгдлээ");
       setIsDrawerOpen(false);
-      setCreateForm({ merchantId: "", phone: "", address: "", price: "", comment: "", districtId: "", deliveryDate: getTodayLocal() });
+      setCreateForm((prev) => ({
+        merchantId: prev.merchantId,
+        phone: "",
+        address: "",
+        price: "",
+        comment: "",
+        districtId: "",
+        deliveryDate: getTodayLocal(),
+      }));
       setProductList([]);
       setRefreshKey((k) => k + 1);
     } else {
@@ -925,7 +940,13 @@ export default function DeliveryPage() {
       <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
         <SheetContent className="overflow-y-auto overflow-x-visible sm:max-w-md px-6">
           <SheetHeader className="px-0 pb-4"><SheetTitle>Хүргэлт үүсгэх</SheetTitle></SheetHeader>
-          <div className="space-y-5 mt-2">
+          <form
+            className="space-y-5 mt-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleCreate();
+            }}
+          >
             {!isMerchant && (
               <div className="space-y-2">
                 <Label>Дэлгүүр</Label>
@@ -941,13 +962,19 @@ export default function DeliveryPage() {
             <div className="space-y-2"><Label>Утас</Label><Input value={createForm.phone} onChange={(e) => setCreateForm((p) => ({ ...p, phone: e.target.value }))} /></div>
             <div className="space-y-2">
               <Label>Дүүрэг</Label>
-              <SearchableSelect
-                value={createForm.districtId}
+              <Select
+                value={createForm.districtId || undefined}
                 onValueChange={(v) => setCreateForm((p) => ({ ...p, districtId: v }))}
-                placeholder="Дүүрэг сонгох"
-                searchPlaceholder="Дүүрэг хайх..."
-                options={DISTRICTS.map((d) => ({ value: String(d.id), label: d.name }))}
-              />
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Дүүрэг сонгох" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DISTRICTS.map((d) => (
+                    <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Хүргэх огноо</Label>
@@ -985,13 +1012,13 @@ export default function DeliveryPage() {
                 {productList.map((item) => (
                   <div key={item.productId} className="flex justify-between text-sm">
                     <span>{item.productName} × {item.quantity}</span>
-                    <button className="text-destructive" onClick={() => setProductList((p) => p.filter((x) => x.productId !== item.productId))}>Устгах</button>
+                    <button type="button" className="text-destructive" onClick={() => setProductList((p) => p.filter((x) => x.productId !== item.productId))}>Устгах</button>
                   </div>
                 ))}
               </div>
             )}
-            <Button className="w-full" onClick={handleCreate}>Үүсгэх</Button>
-          </div>
+            <Button type="submit" className="w-full">Үүсгэх</Button>
+          </form>
         </SheetContent>
       </Sheet>
 
