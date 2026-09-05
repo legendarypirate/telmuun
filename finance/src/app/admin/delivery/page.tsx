@@ -379,19 +379,19 @@ export default function DeliveryPage() {
           <head>
             <title>Print</title>
             <style>
-              body { font-family: Arial, sans-serif; margin: 0; padding: 20px; font-size: 18px; }
-              .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; font-size: 20px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 15px; table-layout: fixed; }
-              th, td { border: 1px solid #ccc; padding: 8px 10px; text-align: left; vertical-align: top; }
-              th { background-color: #f5f5f5; font-weight: bold; font-size: 15px; }
+              body { font-family: Arial, sans-serif; margin: 0; padding: 12px; font-size: 16px; }
+              .header { text-align: center; margin-bottom: 12px; border-bottom: 2px solid #333; padding-bottom: 8px; font-size: 18px; }
+              table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; table-layout: fixed; }
+              th, td { border: 1px solid #ccc; padding: 6px 6px; text-align: left; vertical-align: top; }
+              th { background-color: #f5f5f5; font-weight: bold; font-size: 13px; }
               .num { width: 4%; white-space: nowrap; }
-              .merchant { width: 13%; word-break: break-word; }
-              .phone { width: 12%; white-space: nowrap; word-break: keep-all; overflow-wrap: normal; }
-              .addr { width: 30%; word-break: break-word; }
-              .price { width: 10%; white-space: nowrap; }
-              .comment { width: 16%; word-break: break-word; }
-              .created { width: 15%; white-space: nowrap; font-size: 15px; }
-              @page { size: A4 landscape; margin: 8mm; }
+              .merchant { width: 12%; word-break: break-word; overflow-wrap: break-word; }
+              .phone { width: 11%; white-space: nowrap; word-break: keep-all; overflow-wrap: normal; }
+              .addr { width: 28%; word-break: break-word; overflow-wrap: break-word; }
+              .comment { width: 18%; word-break: break-word; overflow-wrap: break-word; }
+              .price { width: 11%; white-space: nowrap; word-break: keep-all; }
+              .created { width: 16%; white-space: nowrap; word-break: keep-all; overflow-wrap: normal; font-size: 13px; }
+              @page { size: A4 portrait; margin: 8mm; }
             </style>
           </head>
           <body>
