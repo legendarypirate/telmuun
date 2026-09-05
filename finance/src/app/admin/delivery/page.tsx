@@ -12,13 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   FilterBar,
   FilterChip,
   FilterClearButton,
@@ -962,19 +955,37 @@ export default function DeliveryPage() {
             <div className="space-y-2"><Label>Утас</Label><Input value={createForm.phone} onChange={(e) => setCreateForm((p) => ({ ...p, phone: e.target.value }))} /></div>
             <div className="space-y-2">
               <Label>Дүүрэг</Label>
-              <Select
-                value={createForm.districtId || undefined}
-                onValueChange={(v) => setCreateForm((p) => ({ ...p, districtId: v }))}
+              <select
+                value={createForm.districtId}
+                onChange={(e) => setCreateForm((p) => ({ ...p, districtId: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key !== "Tab") return;
+                  e.preventDefault();
+                  const ids = DISTRICTS.map((d) => String(d.id));
+                  const current = createForm.districtId;
+                  const idx = ids.indexOf(current);
+                  let nextIdx: number;
+                  if (e.shiftKey) {
+                    nextIdx = idx <= 0 ? ids.length - 1 : idx - 1;
+                  } else if (idx < 0) {
+                    nextIdx = 0;
+                  } else {
+                    nextIdx = idx >= ids.length - 1 ? 0 : idx + 1;
+                  }
+                  setCreateForm((p) => ({ ...p, districtId: ids[nextIdx] }));
+                }}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Дүүрэг сонгох" />
-                </SelectTrigger>
-                <SelectContent>
-                  {DISTRICTS.map((d) => (
-                    <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <option value="" disabled>
+                  Дүүрэг сонгох
+                </option>
+                {DISTRICTS.map((d) => (
+                  <option key={d.id} value={String(d.id)}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-muted-foreground">Tab / Shift+Tab — дүүрэг солих</p>
             </div>
             <div className="space-y-2">
               <Label>Хүргэх огноо</Label>
