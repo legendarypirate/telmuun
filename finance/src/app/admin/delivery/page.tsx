@@ -385,12 +385,12 @@ export default function DeliveryPage() {
               th, td { border: 1px solid #ccc; padding: 8px 10px; text-align: left; vertical-align: top; }
               th { background-color: #f5f5f5; font-weight: bold; font-size: 15px; }
               .num { width: 4%; white-space: nowrap; }
-              .merchant { width: 14%; word-break: break-word; }
-              .phone { width: 12%; white-space: nowrap; }
-              .price { width: 11%; white-space: nowrap; }
-              .addr { width: 28%; word-break: break-word; }
+              .merchant { width: 13%; word-break: break-word; }
+              .phone { width: 12%; white-space: nowrap; word-break: keep-all; overflow-wrap: normal; }
+              .addr { width: 30%; word-break: break-word; }
+              .price { width: 10%; white-space: nowrap; }
               .comment { width: 16%; word-break: break-word; }
-              .created { width: 15%; white-space: nowrap; }
+              .created { width: 15%; white-space: nowrap; font-size: 15px; }
               @page { size: A4 landscape; margin: 8mm; }
             </style>
           </head>
@@ -404,9 +404,9 @@ export default function DeliveryPage() {
                   <th class="num">№</th>
                   <th class="merchant">Дэлгүүр</th>
                   <th class="phone">Утас</th>
-                  <th class="price">Үнэ</th>
                   <th class="addr">Хаяг</th>
                   <th class="comment">Тайлбар</th>
+                  <th class="price">Үнэ</th>
                   <th class="created">Шивсэн огноо</th>
                 </tr>
               </thead>
@@ -418,9 +418,9 @@ export default function DeliveryPage() {
                         <td class="num">${rowIndex + 1}</td>
                         <td class="merchant">${row.merchant?.username ?? "-"}</td>
                         <td class="phone">${row.phone ?? "-"}</td>
-                        <td class="price">${Number(row.price || 0).toLocaleString()}₮</td>
                         <td class="addr">${row.address ?? "-"}</td>
                         <td class="comment">${row.comment || "-"}</td>
+                        <td class="price">${Number(row.price || 0).toLocaleString()}₮</td>
                         <td class="created">${dayjs(row.createdAt).format("YYYY-MM-DD HH:mm")}</td>
                       </tr>
                     `
