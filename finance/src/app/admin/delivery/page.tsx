@@ -374,6 +374,16 @@ export default function DeliveryPage() {
         return;
       }
 
+      const formatPrintPhone = (phone?: string | null) => {
+        if (!phone?.trim()) return "-";
+        return phone
+          .trim()
+          .split(/[\s,;/|]+/)
+          .filter(Boolean)
+          .map((part) => `<div class="phone-line">${part}</div>`)
+          .join("");
+      };
+
       printWindow.document.write(`
         <html>
           <head>
@@ -386,7 +396,8 @@ export default function DeliveryPage() {
               th { background-color: #f5f5f5; font-weight: bold; font-size: 13px; }
               .num { width: 4%; white-space: nowrap; }
               .merchant { width: 12%; word-break: break-word; overflow-wrap: break-word; }
-              .phone { width: 11%; white-space: nowrap; word-break: keep-all; overflow-wrap: normal; }
+              .phone { width: 11%; font-weight: bold; }
+              .phone-line { white-space: nowrap; word-break: keep-all; overflow-wrap: normal; }
               .addr { width: 28%; word-break: break-word; overflow-wrap: break-word; }
               .comment { width: 18%; word-break: break-word; overflow-wrap: break-word; }
               .price { width: 11%; white-space: nowrap; word-break: keep-all; }
@@ -417,7 +428,7 @@ export default function DeliveryPage() {
                       <tr>
                         <td class="num">${rowIndex + 1}</td>
                         <td class="merchant">${row.merchant?.username ?? "-"}</td>
-                        <td class="phone">${row.phone ?? "-"}</td>
+                        <td class="phone">${formatPrintPhone(row.phone)}</td>
                         <td class="addr">${row.address ?? "-"}</td>
                         <td class="comment">${row.comment || "-"}</td>
                         <td class="price">${Number(row.price || 0).toLocaleString()}₮</td>
