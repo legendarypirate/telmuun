@@ -722,14 +722,51 @@ export default function DeliveryPage() {
 
   const hasPermission = (perm: string) => permissions.includes(perm);
 
+  const openCreateDrawer = () => {
+    setCreateForm((p) => ({ ...p, deliveryDate: p.deliveryDate || getTodayLocal() }));
+    setIsDrawerOpen(true);
+  };
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Enter" || e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isDrawerOpen || isEditOpen || isDeleteOpen || isAllocateOpen || isDeliveryDateOpen || isStatusOpen || isImageOpen) {
+        return;
+      }
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const tag = target.tagName;
+      if (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        tag === "BUTTON" ||
+        target.isContentEditable ||
+        target.closest('[role="dialog"]') ||
+        target.closest("[data-radix-popper-content-wrapper]")
+      ) {
+        return;
+      }
+      e.preventDefault();
+      openCreateDrawer();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    isDrawerOpen,
+    isEditOpen,
+    isDeleteOpen,
+    isAllocateOpen,
+    isDeliveryDateOpen,
+    isStatusOpen,
+    isImageOpen,
+  ]);
+
   return (
     <div className="pb-28">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Хүргэлт</h1>
-        <Button onClick={() => {
-          setCreateForm((p) => ({ ...p, deliveryDate: getTodayLocal() }));
-          setIsDrawerOpen(true);
-        }}>
+        <Button onClick={openCreateDrawer}>
           <Plus className="h-4 w-4" /> Хүргэлт нэмэх
         </Button>
       </div>
