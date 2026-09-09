@@ -225,6 +225,8 @@ export default function DeliveryPage() {
   const [isCreatingBulk, setIsCreatingBulk] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const createPhoneInputRef = useRef<HTMLInputElement | null>(null);
+  const createAddressInputRef = useRef<HTMLInputElement | null>(null);
   const userData = typeof window !== "undefined" ? localStorage.getItem("user") : null;
   const user = userData ? JSON.parse(userData) : null;
   const isMerchant = user?.role === 2;
@@ -533,6 +535,9 @@ export default function DeliveryPage() {
     setCreateCart((prev) => [...prev, draft]);
     resetEntryFields();
     toast.success(`Сагсанд нэмэгдлээ (${createCart.length + 1})`);
+    requestAnimationFrame(() => {
+      createPhoneInputRef.current?.focus();
+    });
   };
 
   const handleCreate = async () => {
@@ -1172,13 +1177,25 @@ export default function DeliveryPage() {
                 />
               </div>
             )}
-            <div className="space-y-2"><Label>Утас</Label><Input value={createForm.phone} onChange={(e) => setCreateForm((p) => ({ ...p, phone: e.target.value }))} /></div>
+            <div className="space-y-2">
+              <Label>Утас</Label>
+              <Input
+                ref={createPhoneInputRef}
+                value={createForm.phone}
+                onChange={(e) => setCreateForm((p) => ({ ...p, phone: e.target.value }))}
+              />
+            </div>
             <div className="space-y-2">
               <Label>Дүүрэг</Label>
               <select
                 value={createForm.districtId}
                 onChange={(e) => setCreateForm((p) => ({ ...p, districtId: e.target.value }))}
                 onKeyDown={(e) => {
+                  if (e.key === " " || e.key === "Spacebar") {
+                    e.preventDefault();
+                    createAddressInputRef.current?.focus();
+                    return;
+                  }
                   if (e.key !== "Tab") return;
                   e.preventDefault();
                   const ids = DISTRICTS.map((d) => String(d.id));
@@ -1205,13 +1222,20 @@ export default function DeliveryPage() {
                   </option>
                 ))}
               </select>
-              <p className="text-[11px] text-muted-foreground">Tab / Shift+Tab — дүүрэг солих</p>
+              <p className="text-[11px] text-muted-foreground">Tab / Shift+Tab — дүүрэг солих · Space — хаяг руу</p>
             </div>
             <div className="space-y-2">
               <Label>Хүргэх огноо</Label>
               <Input type="date" value={createForm.deliveryDate} onChange={(e) => setCreateForm((p) => ({ ...p, deliveryDate: e.target.value }))} />
             </div>
-            <div className="space-y-2"><Label>Хаяг</Label><Input value={createForm.address} onChange={(e) => setCreateForm((p) => ({ ...p, address: e.target.value }))} /></div>
+            <div className="space-y-2">
+              <Label>Хаяг</Label>
+              <Input
+                ref={createAddressInputRef}
+                value={createForm.address}
+                onChange={(e) => setCreateForm((p) => ({ ...p, address: e.target.value }))}
+              />
+            </div>
             <div className="space-y-2"><Label>Үнэ</Label><Input type="number" value={createForm.price} onChange={(e) => setCreateForm((p) => ({ ...p, price: e.target.value }))} /></div>
             <div className="space-y-2"><Label>Тайлбар</Label><Input value={createForm.comment} onChange={(e) => setCreateForm((p) => ({ ...p, comment: e.target.value }))} /></div>
             <label className="flex items-center gap-2 text-sm">
@@ -1254,6 +1278,12 @@ export default function DeliveryPage() {
                 variant="outline"
                 className="w-full border-emerald-700 text-emerald-800 hover:bg-emerald-50"
                 onClick={handleAddToCart}
+                onKeyDown={(e) => {
+                  if (e.key === " " || e.key === "Spacebar") {
+                    e.preventDefault();
+                    createPhoneInputRef.current?.focus();
+                  }
+                }}
                 disabled={isCreatingBulk}
               >
                 <PackagePlus className="h-4 w-4" />
