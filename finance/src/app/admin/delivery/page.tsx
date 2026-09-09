@@ -468,8 +468,13 @@ export default function DeliveryPage() {
   };
 
   const buildCreatePayload = (): CreateDeliveryPayload | null => {
-    if (!createForm.phone || !createForm.address || !createForm.districtId || (!isMerchant && !createForm.merchantId)) {
-      toast.error("Формыг шалгана уу. Дүүрэг сонгоно уу.");
+    const missing: string[] = [];
+    if (!isMerchant && !createForm.merchantId) missing.push("дэлгүүр");
+    if (!createForm.phone?.trim()) missing.push("утас");
+    if (!createForm.districtId) missing.push("дүүрэг");
+    if (!createForm.address?.trim()) missing.push("хаяг");
+    if (missing.length > 0) {
+      toast.error(`Формыг шалгана уу: ${missing.join(", ")}`);
       return null;
     }
     return {
@@ -1190,26 +1195,37 @@ export default function DeliveryPage() {
               <select
                 value={createForm.districtId}
                 onChange={(e) => setCreateForm((p) => ({ ...p, districtId: e.target.value }))}
+                onFocus={() => {
+                  setCreateForm((p) => {
+                    if (p.districtId) return p;
+                    return { ...p, districtId: String(DISTRICTS[0].id) };
+                  });
+                }}
                 onKeyDown={(e) => {
                   if (e.key === " " || e.key === "Spacebar") {
                     e.preventDefault();
-                    createAddressInputRef.current?.focus();
+                    setCreateForm((p) => {
+                      if (p.districtId) return p;
+                      return { ...p, districtId: String(DISTRICTS[0].id) };
+                    });
+                    requestAnimationFrame(() => createAddressInputRef.current?.focus());
                     return;
                   }
                   if (e.key !== "Tab") return;
                   e.preventDefault();
                   const ids = DISTRICTS.map((d) => String(d.id));
-                  const current = createForm.districtId;
-                  const idx = ids.indexOf(current);
-                  let nextIdx: number;
-                  if (e.shiftKey) {
-                    nextIdx = idx <= 0 ? ids.length - 1 : idx - 1;
-                  } else if (idx < 0) {
-                    nextIdx = 0;
-                  } else {
-                    nextIdx = idx >= ids.length - 1 ? 0 : idx + 1;
-                  }
-                  setCreateForm((p) => ({ ...p, districtId: ids[nextIdx] }));
+                  setCreateForm((p) => {
+                    const idx = ids.indexOf(p.districtId);
+                    let nextIdx: number;
+                    if (e.shiftKey) {
+                      nextIdx = idx <= 0 ? ids.length - 1 : idx - 1;
+                    } else if (idx < 0) {
+                      nextIdx = 0;
+                    } else {
+                      nextIdx = idx >= ids.length - 1 ? 0 : idx + 1;
+                    }
+                    return { ...p, districtId: ids[nextIdx] };
+                  });
                 }}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
               >
@@ -1279,7 +1295,9 @@ export default function DeliveryPage() {
                 className="w-full border-emerald-700 text-emerald-800 hover:bg-emerald-50"
                 onClick={handleAddToCart}
                 onKeyDown={(e) => {
-                  if (e.key === " " || e.key === "Spacebar") {
+                  // After a successful add, form is cleared and focus may stay on the button.
+                  // Space should jump to phone for the next delivery instead of re-submitting empty form.
+                  if ((e.key === " " || e.key === "Spacebar") && !createForm.phone.trim()) {
                     e.preventDefault();
                     createPhoneInputRef.current?.focus();
                   }
