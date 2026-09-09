@@ -334,9 +334,9 @@ export default function DeliveryPage() {
               <TableHead>Үүссэн огноо</TableHead>
               <TableHead>Мерчанд нэр</TableHead>
               <TableHead>Утас</TableHead>
-              <TableHead>Хаяг</TableHead>
+              <TableHead className="min-w-[240px] w-[28%] whitespace-normal">Хаяг</TableHead>
               <TableHead>Төлөв</TableHead>
-              <TableHead>Тайлбар</TableHead>
+              <TableHead className="min-w-[200px] w-[22%] whitespace-normal">Тайлбар</TableHead>
               <TableHead>Жолооч нэр</TableHead>
               <TableHead>Үйлдэл</TableHead>
             </TableRow>
@@ -352,13 +352,17 @@ export default function DeliveryPage() {
                   <TableCell>{dayjs(record.createdAt).format("YYYY-MM-DD hh:mm A")}</TableCell>
                   <TableCell>{record.merchant?.username || "-"}</TableCell>
                   <TableCell>{record.phone}</TableCell>
-                  <TableCell>{record.address}</TableCell>
+                  <TableCell className="min-w-[240px] w-[28%] whitespace-normal break-words align-top">
+                    {record.address}
+                  </TableCell>
                   <TableCell>
                     <Badge style={{ backgroundColor: found?.color || "gray", color: "#fff" }}>
                       {found?.label || "Unknown"}
                     </Badge>
                   </TableCell>
-                  <TableCell>{record.comment}</TableCell>
+                  <TableCell className="min-w-[200px] w-[22%] whitespace-normal break-words align-top">
+                    {record.comment}
+                  </TableCell>
                   <TableCell>{record.driver?.username || "-"}</TableCell>
                   <TableCell>
                     <TableActions>
